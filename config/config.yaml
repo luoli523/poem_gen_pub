@@ -1,0 +1,10 @@
+# OpenAI GPT 配置
+# 节气内容、诗词匹配均使用此配置
+openai:
+  model: "gpt-5"                    # 模型名称
+  max_completion_tokens: 16000       # 最大输出 token 数（含推理 token）
+  # response_format 由各模块按需设置（节气/诗词=json_object）
+
+# 输出配置
+output:
+  dir: "./output"
