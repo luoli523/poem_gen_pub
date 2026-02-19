@@ -2,8 +2,8 @@ name: 每日诗词节气内容生成
 
 on:
   schedule:
-    # 每天 UTC 0:30 = 北京时间 8:30（错开 weather_xhs 的 0:00）
-    - cron: "30 0 * * *"
+    # 每天 UTC 23:00 = 北京时间 7:00
+    - cron: "0 23 * * *"
   workflow_dispatch:
     # 支持手动触发
 
