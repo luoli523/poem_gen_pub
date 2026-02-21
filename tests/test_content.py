@@ -63,6 +63,12 @@ class TestPoetryContent:
         caption = poetry_ig(sample_poem)
         assert "赏月" in caption
 
+    def test_ig_caption_no_empty_hashtag_when_occasion_missing(self, sample_poem):
+        poem = {**sample_poem, "occasion": "   "}
+        caption = poetry_ig(poem)
+        assert "# #" not in caption
+        assert "#唐诗宋词" in caption
+
     def test_long_meaning_truncated_in_xhs(self, sample_poem):
         from src.poetry.content import build_xhs_content
         poem = {**sample_poem, "meaning": "赏析" * 200}

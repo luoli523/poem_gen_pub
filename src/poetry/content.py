@@ -122,16 +122,18 @@ def build_ig_caption(poem: dict) -> str:
             "",
         ])
 
-    hashtags = " ".join([
-        f"#{poem.get('occasion', '')}",
-        "#唐诗宋词",
-        "#古典诗词",
-        "#ChinesePoetry",
-        f"#{poem['author']}",
-        "#传统文化",
-        "#中国文化",
-        "#ChineseCulture",
-    ])
+    occasion = poem.get("occasion", "").strip()
+    hashtag_terms = [
+        occasion,
+        "唐诗宋词",
+        "古典诗词",
+        "ChinesePoetry",
+        poem["author"],
+        "传统文化",
+        "中国文化",
+        "ChineseCulture",
+    ]
+    hashtags = " ".join(f"#{term}" for term in hashtag_terms if term)
     lines.append(hashtags)
 
     return "\n".join(lines)

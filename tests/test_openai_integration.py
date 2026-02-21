@@ -172,6 +172,22 @@ class TestPoetryDetector:
 
         assert result is None
 
+    @pytest.mark.asyncio
+    async def test_customs_string_is_normalized_to_list(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        content = {**MOCK_POEM_RESPONSE, "customs": "踏春"}
+
+        mock_create = AsyncMock(return_value=_mock_openai_response(content))
+        mock_client_instance = MagicMock()
+        mock_client_instance.chat.completions.create = mock_create
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client_instance):
+            from src.poetry.detector import get_poem
+            result = await get_poem("2026-02-18")
+
+        assert result is not None
+        assert result["customs"] == ["踏春"]
+
 
 class TestPoetryExtraContext:
     """Test the context builder that feeds GPT."""

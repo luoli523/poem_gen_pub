@@ -1,5 +1,6 @@
 """Integration tests for Telegram and Instagram with mocked HTTP."""
 
+import sys
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from src.common.telegram import get_telegram_config, send_message
@@ -91,3 +92,53 @@ class TestInstagramConfig:
         config = get_ig_config()
         assert config is not None
         assert config["username"] == "testuser"
+
+
+class TestInstagramClient:
+
+    def test_session_only_login_success(self, monkeypatch, tmp_path):
+        from src.common.instagram import _get_client
+
+        session_file = tmp_path / "session.json"
+        session_file.write_text("{}")
+
+        # Mock optional dependency import inside _get_client
+        monkeypatch.setitem(sys.modules, "instagrapi", MagicMock())
+
+        mock_client = MagicMock()
+        mock_client.get_timeline_feed.return_value = {}
+
+        with patch("src.common.instagram._new_client", return_value=mock_client):
+            config = {
+                "username": "",
+                "password": "",
+                "session_path": str(session_file),
+            }
+            result = _get_client(config)
+
+        assert result is mock_client
+        mock_client.load_settings.assert_called_once_with(str(session_file))
+        mock_client.get_timeline_feed.assert_called_once()
+        mock_client.dump_settings.assert_called_once_with(str(session_file))
+
+    def test_session_invalid_without_credentials_returns_none(self, monkeypatch, tmp_path):
+        from src.common.instagram import _get_client
+
+        session_file = tmp_path / "session.json"
+        session_file.write_text("{}")
+
+        monkeypatch.setitem(sys.modules, "instagrapi", MagicMock())
+
+        mock_client = MagicMock()
+        mock_client.get_timeline_feed.side_effect = Exception("expired")
+        mock_client.account_info.side_effect = Exception("expired")
+
+        with patch("src.common.instagram._new_client", return_value=mock_client):
+            config = {
+                "username": "",
+                "password": "",
+                "session_path": str(session_file),
+            }
+            result = _get_client(config)
+
+        assert result is None

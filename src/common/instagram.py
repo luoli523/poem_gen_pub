@@ -116,8 +116,7 @@ def _get_client(config: dict):
         cl = _new_client()
         try:
             cl.load_settings(session_path)
-            cl.login(config["username"], config["password"])
-            # 验证 session 是否有效
+            # 先直接验证 session（支持仅 session、无账密场景）
             try:
                 cl.get_timeline_feed()
             except Exception:
@@ -129,7 +128,7 @@ def _get_client(config: dict):
             return cl
         except Exception as e:
             print(f"  ⚠ Session 加载失败: {e}")
-            print("  尝试仅凭 session 设备指纹重新登录...")
+            print("  尝试使用账密回退登录...")
 
             # 策略 1b：保留设备指纹但重新登录
             if config["username"] and config["password"]:
@@ -144,6 +143,9 @@ def _get_client(config: dict):
                     return cl2
                 except Exception as e2:
                     print(f"  ⚠ 设备指纹重新登录也失败: {e2}")
+            else:
+                print("  ❌ Session 已失效，且未提供 IG_USERNAME / IG_PASSWORD 进行回退登录")
+                return None
 
     # ── 策略 2：无 session，纯账密登录 ──
     if not config["username"] or not config["password"]:

@@ -234,6 +234,23 @@ async def get_poem(date_str: str) -> dict | None:
                 print(f"  ⚠ GPT 返回缺少字段: {field}")
                 return None
 
+        # 归一化字段类型，避免下游文案构建出现类型错误
+        text_fields = ["title", "author", "dynasty", "full_text", "meaning", "infographic_prompt", "occasion"]
+        for field in text_fields:
+            value = data.get(field, "")
+            if value is None:
+                data[field] = ""
+            elif not isinstance(value, str):
+                data[field] = str(value)
+
+        customs = data.get("customs", [])
+        if isinstance(customs, list):
+            data["customs"] = [str(item) for item in customs if item is not None]
+        elif isinstance(customs, str):
+            data["customs"] = [customs] if customs.strip() else []
+        else:
+            data["customs"] = []
+
         return data
 
     except ImportError:
