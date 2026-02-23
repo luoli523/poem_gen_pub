@@ -23,9 +23,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          playwright install chromium
+        run: pip install -r requirements.txt
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short
@@ -37,15 +35,6 @@ jobs:
           echo "$NOTEBOOKLM_STORAGE_STATE" | base64 -d > ~/.notebooklm/storage_state.json
         env:
           NOTEBOOKLM_STORAGE_STATE: ${{ secrets.NOTEBOOKLM_STORAGE_STATE }}
-
-      - name: Restore XHS auth
-        if: env.XHS_STORAGE_STATE != ''
-        run: |
-          mkdir -p ~/.xhs
-          echo "$XHS_STORAGE_STATE" | base64 -d > ~/.xhs/storage_state.json
-          echo "XHS_ENABLED=true" >> "$GITHUB_ENV"
-        env:
-          XHS_STORAGE_STATE: ${{ secrets.XHS_STORAGE_STATE }}
 
       - name: Restore Instagram session
         if: env.IG_SESSION != ''

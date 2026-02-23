@@ -21,7 +21,6 @@ class TestPipelineSmoke:
             "OPENAI_API_KEY": "test-key-for-smoke",
             "TELEGRAM_ENABLED": "false",
             "IG_ENABLED": "false",
-            "XHS_ENABLED": "false",
         }
         if extra_env:
             env.update(extra_env)

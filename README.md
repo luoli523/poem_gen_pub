@@ -7,7 +7,7 @@
 - **节气检测**：自动识别二十四节气及传统节日（七夕、重阳等）
 - **诗词匹配**：调用 GPT 动态匹配当日最应景的古诗词
 - **Infographic 生成**：通过 NotebookLM 将内容渲染为精美图片
-- **多平台发布**：自动推送到 Telegram、Instagram（小红书可选）
+- **多平台发布**：自动推送到 Telegram、Instagram
 - **每日自动运行**：GitHub Actions 每天北京时间 7:00 执行
 
 ## 流程
@@ -23,7 +23,6 @@
 
 ```bash
 pip install -r requirements.txt
-playwright install chromium
 ```
 
 ### 2. 配置环境变量
@@ -36,14 +35,14 @@ cp .env.example .env
 
 | 变量 | 说明 | 必填 |
 |---|---|---|
-| `OPENAI_API_KEY` | OpenAI API Key | 是 |
+| `GROK_API_KEY` | Grok (xAI) API Key（与 OPENAI_API_KEY 二选一） | 是 |
+| `OPENAI_API_KEY` | OpenAI API Key（与 GROK_API_KEY 二选一） | 是 |
 | `TELEGRAM_ENABLED` | 是否启用 Telegram（true/false） | 否 |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot Token | Telegram 启用时必填 |
 | `TELEGRAM_CHAT_ID` | Telegram Chat ID | Telegram 启用时必填 |
 | `IG_ENABLED` | 是否启用 Instagram（true/false） | 否 |
 | `IG_USERNAME` | Instagram 用户名 | IG 启用时必填 |
 | `IG_PASSWORD` | Instagram 密码 | IG 启用时必填 |
-| `XHS_ENABLED` | 是否启用小红书（true/false） | 否 |
 
 ### 3. 登录第三方服务
 
@@ -55,11 +54,6 @@ python -c "from notebooklm import login; login()"
 **Instagram**（可选）：
 ```bash
 python scripts/ig_login.py
-```
-
-**小红书**（可选）：
-```bash
-python scripts/xhs_login.py
 ```
 
 ### 4. 运行
@@ -90,7 +84,6 @@ python main.py
 | `IG_USERNAME` | Instagram 用户名 |
 | `IG_PASSWORD` | Instagram 密码 |
 | `IG_SESSION` | Instagram session（base64，可选） |
-| `XHS_STORAGE_STATE` | 小红书登录态（base64，可选） |
 
 生成 base64 session：
 ```bash
@@ -105,11 +98,10 @@ base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 ├── config/
 │   └── config.yaml          # LLM 模型及输出配置
 ├── src/
-│   ├── common/              # 共享模块（Telegram、Instagram、小红书、NotebookLM）
-│   ├── poetry/              # 诗词模块（检测、内容生成、NotebookLM 流程）
-│   └── solar_term/          # 节气模块（检测、内容生成、NotebookLM 流程）
+│   ├── common/              # 共享模块（Telegram、Instagram、NotebookLM）
+│   ├── poetry/              # 诗词模块（检测、内容生成）
+│   └── solar_term/          # 节气模块（检测、内容生成）
 ├── scripts/
-│   ├── ig_login.py          # Instagram 登录辅助
-│   └── xhs_login.py         # 小红书登录辅助
+│   └── ig_login.py          # Instagram 登录辅助
 └── tests/                   # 测试
 ```

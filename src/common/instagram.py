@@ -2,7 +2,7 @@
 
 使用 instagrapi 库实现 Instagram 发布，支持单图和相册。
 
-认证策略（与小红书 storage_state 类似）：
+认证策略：
   1. 本地运行 scripts/ig_login.py 完成首次登录（含 Challenge 验证）
   2. session 保存到 ~/.instagram/session.json
   3. 后续运行优先加载 session，不触发 Challenge

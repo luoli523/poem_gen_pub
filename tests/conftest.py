@@ -14,7 +14,6 @@ def _isolate_env(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("IG_ENABLED", raising=False)
-    monkeypatch.delenv("XHS_ENABLED", raising=False)
 
     from src.common.config import reset_cache
     reset_cache()

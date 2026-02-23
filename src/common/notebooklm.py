@@ -30,7 +30,7 @@ async def check_auth() -> bool:
 
 
 async def find_or_create_notebook(client: NotebookLMClient) -> str:
-    """查找 weather_xhs notebook，不存在则创建。返回 notebook_id"""
+    """查找 poem_solar_term notebook，不存在则创建。返回 notebook_id"""
     notebooks = await client.notebooks.list()
     for nb in notebooks:
         if nb.title == NOTEBOOK_TITLE:

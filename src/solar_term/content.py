@@ -1,7 +1,7 @@
 """节气内容生成模块
 
 生成节气相关的 Markdown（NotebookLM source）、
-小红书笔记内容和 Telegram 消息文案。
+Instagram 文案和 Telegram 消息文案。
 infographic prompt 由 GPT 在 detector.py 中动态生成。
 """
 
@@ -46,53 +46,6 @@ def save_markdown(content: str, output_path: str) -> str:
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
     return output_path
-
-
-# ── 小红书笔记内容 ──
-
-
-def build_xhs_content(term: dict) -> tuple[str, str, list[str]]:
-    """构建节气小红书笔记的标题、正文和标签。
-
-    Returns:
-        (title, content, tags) 三元组
-    """
-    title = f"今日{term['name']}｜{term['season']}季养生指南"
-    if len(title) > 20:
-        title = title[:20]
-
-    lines = []
-    lines.append(f"🌿 今日{term['name']}（{term['date']}）")
-    lines.append("")
-    lines.append(f"📖 {term['meaning']}")
-    lines.append("")
-    lines.append(term["description"])
-    lines.append("")
-
-    lines.append("🎎 传统习俗")
-    for custom in term["customs"]:
-        lines.append(f"  • {custom}")
-    lines.append("")
-
-    lines.append(f"🍽 节气美食：{term['food']}")
-    lines.append("")
-
-    lines.append(f"💆 养生贴士：{term['health_tip']}")
-
-    content = "\n".join(lines)
-
-    tags = [
-        term["name"],
-        "二十四节气",
-        "节气",
-        f"{term['season']}季养生",
-        "传统文化",
-        "中国节气",
-        "养生",
-        "节气美食",
-    ]
-
-    return title, content, tags
 
 
 # ── Instagram 帖子文案 ──

@@ -1,7 +1,7 @@
 """诗词内容生成模块
 
 从 GPT 返回的诗词数据构建 Markdown（NotebookLM source）、
-小红书笔记内容、Instagram 文案和 Telegram 消息文案。
+Instagram 文案和 Telegram 消息文案。
 
 注意：infographic prompt 由 GPT 动态生成，不在此模块中构建。
 """
@@ -44,58 +44,6 @@ def save_markdown(content: str, output_path: str) -> str:
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
     return output_path
-
-
-# ── 小红书笔记内容 ──
-
-
-def build_xhs_content(poem: dict) -> tuple[str, str, list[str]]:
-    """构建诗词小红书笔记的标题、正文和标签。
-
-    Returns:
-        (title, content, tags) 三元组
-    """
-    occasion = poem.get("occasion", "")
-    title = f"今日{occasion}｜{poem['title']}"
-    if len(title) > 20:
-        title = f"{occasion}｜{poem['title']}"[:20]
-
-    lines = []
-    lines.append(f"📜 {poem['title']}")
-    lines.append(f"    —— {poem['dynasty']}·{poem['author']}")
-    lines.append("")
-    lines.append(poem["full_text"])
-    lines.append("")
-
-    lines.append(f"📖 赏析")
-    # 截取赏析前200字避免过长
-    meaning = poem["meaning"]
-    if len(meaning) > 200:
-        meaning = meaning[:200] + "……"
-    lines.append(meaning)
-    lines.append("")
-
-    if poem.get("customs"):
-        lines.append("🎎 风俗知识")
-        for custom in poem["customs"][:4]:
-            lines.append(f"  • {custom}")
-
-    content = "\n".join(lines)
-
-    tags = [
-        poem.get("occasion", ""),
-        "唐诗宋词",
-        "古典诗词",
-        "中国文化",
-        "传统文化",
-        poem["author"],
-        "诗词赏析",
-        "文化科普",
-    ]
-    # 过滤空标签
-    tags = [t for t in tags if t]
-
-    return title, content, tags
 
 
 # ── Instagram 帖子文案 ──
