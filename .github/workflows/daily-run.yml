@@ -31,6 +31,7 @@ jobs:
         run: python -m pytest tests/ -v --tb=short
 
       - name: Restore NotebookLM auth
+        if: env.NOTEBOOKLM_STORAGE_STATE != ''
         run: |
           mkdir -p ~/.notebooklm
           echo "$NOTEBOOKLM_STORAGE_STATE" | base64 -d > ~/.notebooklm/storage_state.json

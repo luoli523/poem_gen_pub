@@ -1,7 +1,8 @@
-# OpenAI GPT 配置
+# LLM 配置（兼容 OpenAI API 的服务均可使用，如 ChatGPT、Grok、DeepSeek 等）
 # 节气内容、诗词匹配均使用此配置
 openai:
-  model: "gpt-5"                    # 模型名称
+  #model: "gpt-5"                    # 模型名称（按实际服务填写，如 grok-3、deepseek-chat）
+  model: "grok-4-1-fast-reasoning"                    # 模型名称（按实际服务填写，如 grok-3、deepseek-chat）
   max_completion_tokens: 16000       # 最大输出 token 数（含推理 token）
   # response_format 由各模块按需设置（节气/诗词=json_object）
 

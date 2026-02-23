@@ -7,11 +7,17 @@ import pytest
 def _isolate_env(monkeypatch):
     """Ensure tests don't leak env vars or trigger real API calls."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.delenv("GROK_API_KEY", raising=False)
+    monkeypatch.delenv("GROK_BASE_URL", raising=False)
     monkeypatch.delenv("TELEGRAM_ENABLED", raising=False)
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("IG_ENABLED", raising=False)
     monkeypatch.delenv("XHS_ENABLED", raising=False)
+
+    from src.common.config import reset_cache
+    reset_cache()
 
 
 @pytest.fixture

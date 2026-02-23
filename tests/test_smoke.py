@@ -39,13 +39,13 @@ class TestPipelineSmoke:
         assert result.returncode == 0, f"STDERR:\n{result.stderr}\nSTDOUT:\n{result.stdout}"
         assert "古诗词与节气" in result.stdout
 
-    def test_missing_openai_key_exits_early(self):
-        """Without OPENAI_API_KEY, pipeline should exit early."""
+    def test_missing_api_key_exits_early(self):
+        """Without any LLM API key, pipeline should exit early."""
         result = self._run_main(
             ["--no-nlm", "--no-ig"],
-            extra_env={"OPENAI_API_KEY": ""},
+            extra_env={"OPENAI_API_KEY": "", "GROK_API_KEY": ""},
         )
-        assert "OPENAI_API_KEY 未配置" in result.stdout
+        assert "LLM API Key 未配置" in result.stdout
 
     def test_help_flag(self):
         result = subprocess.run(

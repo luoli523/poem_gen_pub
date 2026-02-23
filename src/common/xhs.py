@@ -1,7 +1,7 @@
 """小红书共享基础功能
 
 提供配置读取和笔记发布自动化（Playwright），
-供 clothing 和 solar_term 模块复用。
+供 solar_term 和 poetry 模块复用。
 
 环境变量：
   XHS_ENABLED            - 是否启用小红书发布（true 启用）

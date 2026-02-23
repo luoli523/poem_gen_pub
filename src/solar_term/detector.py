@@ -14,13 +14,7 @@ try:
 except ImportError:
     sxtwl = None
 
-# sxtwl 节气名称顺序（索引 0~23）
-JIEQI_NAMES = [
-    "冬至", "小寒", "大寒", "立春", "雨水", "惊蛰",
-    "春分", "清明", "谷雨", "立夏", "小满", "芒种",
-    "夏至", "小暑", "大暑", "立秋", "处暑", "白露",
-    "秋分", "寒露", "霜降", "立冬", "小雪", "大雪",
-]
+from src.common.constants import JIEQI_NAMES
 
 # 节气所属季节
 _SEASON_MAP = {
@@ -73,8 +67,9 @@ SOLAR_TERM_USER_TEMPLATE = """\
 
 async def _generate_via_gpt(name: str, date_str: str, season: str) -> dict | None:
     """调用 GPT 生成节气内容和 infographic prompt。"""
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
+    from src.common.config import get_llm_config
+    llm = get_llm_config()
+    if not llm["api_key"]:
         return None
 
     user_prompt = SOLAR_TERM_USER_TEMPLATE.format(
@@ -83,10 +78,8 @@ async def _generate_via_gpt(name: str, date_str: str, season: str) -> dict | Non
 
     try:
         from openai import AsyncOpenAI
-        from src.common.config import get_openai_config
 
-        llm = get_openai_config()
-        client = AsyncOpenAI(api_key=api_key)
+        client = AsyncOpenAI(api_key=llm["api_key"], base_url=llm.get("base_url"))
         response = await client.chat.completions.create(
             model=llm["model"],
             messages=[

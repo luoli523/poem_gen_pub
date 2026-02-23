@@ -111,7 +111,7 @@ def build_ig_caption(poem: dict) -> str:
         "",
         poem["full_text"],
         "",
-        f"📖 {poem['meaning'][:200]}",
+        f"📖 {poem['meaning'][:200]}{'……' if len(poem['meaning']) > 200 else ''}",
         "",
     ]
 

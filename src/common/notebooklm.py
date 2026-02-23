@@ -1,7 +1,7 @@
 """NotebookLM 共享基础功能
 
-提供 notebook 查找/创建、source 上传、infographic 创建（含重试）等通用操作，
-供 clothing、solar_term 和 poetry 模块复用。
+提供 notebook 查找/创建、source 上传、infographic 创建（含重试）和通用 pipeline，
+供 solar_term 和 poetry 模块复用。
 """
 
 import asyncio
@@ -9,7 +9,7 @@ from pathlib import Path
 
 from notebooklm import NotebookLMClient, InfographicOrientation, InfographicDetail
 
-NOTEBOOK_TITLE = "weather_xhs"
+NOTEBOOK_TITLE = "poem_solar_term"
 
 
 async def check_auth() -> bool:
@@ -100,3 +100,60 @@ async def create_infographic_with_retry(
             await asyncio.sleep(wait_sec)
 
     return None
+
+
+async def run_pipeline(
+    label: str,
+    md_file: str,
+    prompt: str,
+    artifact_name: str,
+    output_dir: str,
+) -> str | None:
+    """通用 NotebookLM pipeline：上传 Markdown → 生成 infographic → 下载
+
+    Args:
+        label: 内容类型标签（如 "节气"、"诗词"），用于日志输出
+        md_file: Markdown 文件路径
+        prompt: infographic 生成 prompt
+        artifact_name: 生成物命名
+        output_dir: 输出目录
+
+    Returns:
+        生成的图片文件路径，失败返回 None
+    """
+    print(f"\n{label} NotebookLM Pipeline 开始")
+
+    async with await NotebookLMClient.from_storage() as client:
+        print("\n[1/3] 查找 notebook...")
+        notebook_id = await find_or_create_notebook(client)
+
+        print(f"\n[2/3] 上传{label} source...")
+        source_id = await upload_source(client, notebook_id, md_file)
+
+        print(f"\n[3/3] 生成{label} infographic...")
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        status = await create_infographic_with_retry(
+            client, notebook_id, source_id, prompt,
+        )
+        if not status:
+            print(f"    ❌ {label} infographic 创建失败")
+            return None
+
+        print(f"    等待生成完成 (task_id={status.task_id[:8]}...)...")
+        await client.artifacts.wait_for_completion(
+            notebook_id, status.task_id, timeout=300
+        )
+
+        await client.artifacts.rename(notebook_id, status.task_id, artifact_name)
+        print(f"    已命名: {artifact_name}")
+
+        out_file = str(output_path / f"{artifact_name}.png")
+        await client.artifacts.download_infographic(
+            notebook_id, out_file, artifact_id=status.task_id
+        )
+        print(f"    已下载: {out_file}")
+
+        print(f"\n{label} NotebookLM Pipeline 完成")
+        return out_file

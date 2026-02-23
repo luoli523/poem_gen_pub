@@ -107,17 +107,12 @@ def _build_extra_context(date_str: str) -> str:
     # 节气
     try:
         import sxtwl
+        from src.common.constants import JIEQI_NAMES
 
         day = sxtwl.fromSolar(dt.year, dt.month, dt.day)
         if day.hasJieQi():
-            jq_names = [
-                "冬至", "小寒", "大寒", "立春", "雨水", "惊蛰",
-                "春分", "清明", "谷雨", "立夏", "小满", "芒种",
-                "夏至", "小暑", "大暑", "立秋", "处暑", "白露",
-                "秋分", "寒露", "霜降", "立冬", "小雪", "大雪",
-            ]
             jq_index = day.getJieQi()
-            jq_name = jq_names[jq_index]
+            jq_name = JIEQI_NAMES[jq_index]
             parts.append(f"今天是二十四节气之「{jq_name}」")
     except ImportError:
         pass
@@ -143,11 +138,8 @@ def _build_extra_context(date_str: str) -> str:
 
     # 母亲节（5月第二个周日）
     if dt.month == 5 and dt.weekday() == 6:
-        # 计算是第几个周日
         first_day = dt.replace(day=1)
         first_sunday = first_day.day + (6 - first_day.weekday()) % 7
-        if first_sunday == 0:
-            first_sunday = 7
         second_sunday = first_sunday + 7
         if dt.day == second_sunday:
             parts.append("今天是母亲节（5月第二个星期日）")
@@ -156,8 +148,6 @@ def _build_extra_context(date_str: str) -> str:
     if dt.month == 6 and dt.weekday() == 6:
         first_day = dt.replace(day=1)
         first_sunday = first_day.day + (6 - first_day.weekday()) % 7
-        if first_sunday == 0:
-            first_sunday = 7
         third_sunday = first_sunday + 14
         if dt.day == third_sunday:
             parts.append("今天是父亲节（6月第三个星期日）")
@@ -178,8 +168,9 @@ async def get_poem(date_str: str) -> dict | None:
         诗词信息字典（含 title, author, dynasty, full_text, meaning,
         customs, infographic_prompt, occasion, date）或 None
     """
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
+    from src.common.config import get_llm_config
+    llm = get_llm_config()
+    if not llm["api_key"]:
         return None
 
     try:
@@ -198,10 +189,8 @@ async def get_poem(date_str: str) -> dict | None:
 
     try:
         from openai import AsyncOpenAI
-        from src.common.config import get_openai_config
 
-        llm = get_openai_config()
-        client = AsyncOpenAI(api_key=api_key)
+        client = AsyncOpenAI(api_key=llm["api_key"], base_url=llm.get("base_url"))
 
         response = await client.chat.completions.create(
             model=llm["model"],

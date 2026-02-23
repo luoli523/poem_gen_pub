@@ -1,6 +1,6 @@
 """Telegram 共享基础功能
 
-提供配置读取、单张图片发送和多图相册发送，供 clothing 和 solar_term 模块复用。
+提供配置读取、单张图片发送和多图相册发送，供 solar_term 和 poetry 模块复用。
 
 环境变量：
   TELEGRAM_BOT_TOKEN  - Bot Token（从 @BotFather 获取）
