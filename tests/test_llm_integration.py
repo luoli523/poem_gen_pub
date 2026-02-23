@@ -207,6 +207,77 @@ class TestPoetryDetector:
         assert result["customs"] == ["踏春"]
 
 
+class TestPoemHistory:
+    """Test poem deduplication via history tracking."""
+
+    def test_save_and_load_history(self):
+        from src.poetry.detector import _save_to_history, _load_history
+        _save_to_history({"title": "静夜思", "author": "李白", "date": "2026-02-20"})
+        _save_to_history({"title": "春望", "author": "杜甫", "date": "2026-02-21"})
+        history = _load_history()
+        assert len(history) == 2
+        assert history[0]["title"] == "静夜思"
+        assert history[1]["title"] == "春望"
+
+    def test_history_excludes_old_entries(self):
+        from src.poetry.detector import _HISTORY_PATH, _load_history
+        import json
+        old = [{"title": "旧诗", "author": "古人", "date": "2020-01-01"}]
+        _HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _HISTORY_PATH.write_text(json.dumps(old), encoding="utf-8")
+        assert _load_history(days=90) == []
+
+    def test_format_history_for_prompt(self):
+        from src.poetry.detector import _format_history_for_prompt
+        history = [
+            {"title": "静夜思", "author": "李白", "date": "2026-02-20"},
+            {"title": "春望", "author": "杜甫", "date": "2026-02-21"},
+        ]
+        text = _format_history_for_prompt(history)
+        assert "静夜思" in text
+        assert "春望" in text
+        assert "避开" in text
+
+    def test_format_history_empty(self):
+        from src.poetry.detector import _format_history_for_prompt
+        assert _format_history_for_prompt([]) == ""
+
+    @pytest.mark.asyncio
+    async def test_poem_saved_to_history(self, monkeypatch):
+        """After a successful poem selection, it should be saved to history."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_POEM_RESPONSE))
+        mock_client_instance = MagicMock()
+        mock_client_instance.chat.completions.create = mock_create
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client_instance):
+            from src.poetry.detector import get_poem, _load_history
+            await get_poem("2026-02-18")
+            history = _load_history()
+
+        assert len(history) == 1
+        assert history[0]["title"] == "春夜喜雨"
+
+    @pytest.mark.asyncio
+    async def test_history_passed_to_prompt(self, monkeypatch):
+        """History titles should appear in the user message sent to LLM."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        from src.poetry.detector import _save_to_history
+        _save_to_history({"title": "静夜思", "author": "李白", "date": "2026-02-20"})
+
+        mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_POEM_RESPONSE))
+        mock_client_instance = MagicMock()
+        mock_client_instance.chat.completions.create = mock_create
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client_instance):
+            from src.poetry.detector import get_poem
+            await get_poem("2026-02-21")
+
+        user_msg = mock_create.call_args[1]["messages"][1]["content"]
+        assert "静夜思" in user_msg
+
+
 class TestPoetryExtraContext:
     """Test the context builder that feeds LLM."""
 

@@ -8,9 +8,54 @@
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 
 WEEKDAY_NAMES = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+
+# ── 诗词历史记录（去重）──
+
+_HISTORY_PATH = Path("data/poem_history.json")
+_HISTORY_DAYS = 90
+
+
+def _load_history(days: int = _HISTORY_DAYS) -> list[dict]:
+    """加载近 N 天内的诗词选择记录。"""
+    if not _HISTORY_PATH.exists():
+        return []
+    try:
+        records = json.loads(_HISTORY_PATH.read_text(encoding="utf-8"))
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        return [r for r in records if r.get("date", "") >= cutoff]
+    except Exception:
+        return []
+
+
+def _save_to_history(poem: dict) -> None:
+    """将选中的诗词追加到历史记录，同时清理过期条目。"""
+    record = {
+        "title": poem.get("title", ""),
+        "author": poem.get("author", ""),
+        "date": poem.get("date", ""),
+    }
+    history = _load_history(days=_HISTORY_DAYS)
+    history.append(record)
+    _HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _HISTORY_PATH.write_text(
+        json.dumps(history, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _format_history_for_prompt(history: list[dict]) -> str:
+    """将历史记录格式化为 prompt 中的排除列表。"""
+    if not history:
+        return ""
+    titles = [f"「{r['title']}」({r['author']})" for r in history if r.get("title")]
+    if not titles:
+        return ""
+    return "\n\n⚠ 以下诗词近期已被选过，请务必避开：\n" + "、".join(titles)
+
 
 # ── System Prompt ──
 
@@ -210,14 +255,18 @@ async def get_poem(date_str: str) -> dict | None:
 
         client = AsyncOpenAI(api_key=llm["api_key"], base_url=llm.get("base_url"))
 
+        history = _load_history()
+        history_hint = _format_history_for_prompt(history)
+
         # 第一步：尝试匹配日期关联诗词
+        user_msg = USER_PROMPT_TEMPLATE.format(
+            date=date_str, weekday=weekday, extra_context=extra_context,
+        ) + history_hint
         response = await client.chat.completions.create(
             model=llm["model"],
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(
-                    date=date_str, weekday=weekday, extra_context=extra_context,
-                )},
+                {"role": "user", "content": user_msg},
             ],
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
@@ -229,17 +278,19 @@ async def get_poem(date_str: str) -> dict | None:
             if data.get("has_poem", False):
                 result = _validate_and_normalize(data, date_str)
                 if result:
+                    _save_to_history(result)
                     return result
 
         # 第二步：无匹配，随机推荐一首
         print("  📝 无日期关联诗词，随机推荐...")
+        user_msg = RANDOM_POEM_USER_TEMPLATE.format(
+            date=date_str, weekday=weekday, extra_context=extra_context,
+        ) + history_hint
         response = await client.chat.completions.create(
             model=llm["model"],
             messages=[
                 {"role": "system", "content": RANDOM_POEM_SYSTEM_PROMPT},
-                {"role": "user", "content": RANDOM_POEM_USER_TEMPLATE.format(
-                    date=date_str, weekday=weekday, extra_context=extra_context,
-                )},
+                {"role": "user", "content": user_msg},
             ],
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
@@ -251,7 +302,10 @@ async def get_poem(date_str: str) -> dict | None:
             return None
 
         data = json.loads(content)
-        return _validate_and_normalize(data, date_str)
+        result = _validate_and_normalize(data, date_str)
+        if result:
+            _save_to_history(result)
+        return result
 
     except ImportError:
         print("  ⚠ openai 库未安装，无法使用诗词模块")

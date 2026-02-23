@@ -22,6 +22,12 @@ jobs:
           python-version: "3.13"
           cache: "pip"
 
+      - name: Restore poem history cache
+        uses: actions/cache@v4
+        with:
+          path: data/
+          key: poem-history
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 

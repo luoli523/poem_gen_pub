@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .env
 output/
+data/
 .venv/
 *.egg-info/
 dist/

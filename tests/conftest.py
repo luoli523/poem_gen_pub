@@ -1,11 +1,12 @@
 """Shared test fixtures for poem_gen_pub tests."""
 
 import pytest
+from pathlib import Path
 
 
 @pytest.fixture(autouse=True)
-def _isolate_env(monkeypatch):
-    """Ensure tests don't leak env vars or trigger real API calls."""
+def _isolate_env(monkeypatch, tmp_path):
+    """Ensure tests don't leak env vars, trigger real API calls, or write to real data/."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     monkeypatch.delenv("GROK_API_KEY", raising=False)
@@ -17,6 +18,9 @@ def _isolate_env(monkeypatch):
 
     from src.common.config import reset_cache
     reset_cache()
+
+    import src.poetry.detector as det
+    monkeypatch.setattr(det, "_HISTORY_PATH", tmp_path / "poem_history.json")
 
 
 @pytest.fixture
