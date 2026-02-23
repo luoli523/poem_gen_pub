@@ -82,7 +82,8 @@ python main.py
 
 | Secret | 说明 |
 |---|---|
-| `OPENAI_API_KEY` | OpenAI API Key |
+| `GROK_API_KEY` | Grok (xAI) API Key（与 OPENAI_API_KEY 二选一） |
+| `OPENAI_API_KEY` | OpenAI API Key（与 GROK_API_KEY 二选一） |
 | `NOTEBOOKLM_STORAGE_STATE` | NotebookLM 登录态（base64） |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot Token |
 | `TELEGRAM_CHAT_ID` | Telegram Chat ID |
@@ -102,8 +103,7 @@ base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 ```
 ├── main.py                  # 主入口
 ├── config/
-│   ├── config.yaml          # OpenAI 及输出配置
-│   └── special_days.yaml    # 特殊节日配置
+│   └── config.yaml          # LLM 模型及输出配置
 ├── src/
 │   ├── common/              # 共享模块（Telegram、Instagram、小红书、NotebookLM）
 │   ├── poetry/              # 诗词模块（检测、内容生成、NotebookLM 流程）
