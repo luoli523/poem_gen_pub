@@ -1,8 +1,8 @@
 """二十四节气检测模块
 
 使用 sxtwl（寿星天文历）判断给定日期是否为节气日，
-并调用 GPT 动态生成节气详细内容和 infographic prompt。
-如果 OPENAI_API_KEY 未配置，回退到基础信息。
+并调用 LLM 动态生成节气详细内容和 infographic prompt。
+如果 LLM API Key 未配置，回退到基础信息。
 """
 
 import json
@@ -29,7 +29,7 @@ _SEASON_MAP = {
 }
 
 
-# ── GPT Prompt ──
+# ── LLM Prompt ──
 
 SOLAR_TERM_SYSTEM_PROMPT = """\
 你是一位中国传统文化专家和信息图设计师。
@@ -65,8 +65,8 @@ SOLAR_TERM_USER_TEMPLATE = """\
 请根据此节气生成详细内容和信息图 prompt。"""
 
 
-async def _generate_via_gpt(name: str, date_str: str, season: str) -> dict | None:
-    """调用 GPT 生成节气内容和 infographic prompt。"""
+async def _generate_via_llm(name: str, date_str: str, season: str) -> dict | None:
+    """调用 LLM 生成节气内容和 infographic prompt。"""
     from src.common.config import get_llm_config
     llm = get_llm_config()
     if not llm["api_key"]:
@@ -97,7 +97,7 @@ async def _generate_via_gpt(name: str, date_str: str, season: str) -> dict | Non
         required = ["meaning", "description", "customs", "food", "health_tip", "infographic_prompt"]
         for key in required:
             if key not in data:
-                print(f"    ⚠ GPT 返回缺少字段 '{key}'")
+                print(f"    ⚠ LLM 返回缺少字段 '{key}'")
                 return None
 
         if not isinstance(data["customs"], list):
@@ -106,12 +106,12 @@ async def _generate_via_gpt(name: str, date_str: str, season: str) -> dict | Non
         return data
 
     except Exception as e:
-        print(f"    ⚠ GPT 节气内容生成失败: {type(e).__name__}: {e}")
+        print(f"    ⚠ LLM 节气内容生成失败: {type(e).__name__}: {e}")
         return None
 
 
 def _build_fallback(name: str, date_str: str, season: str) -> dict:
-    """GPT 不可用时的基础回退。"""
+    """LLM 不可用时的基础回退。"""
     return {
         "meaning": f"{name}是二十四节气之一",
         "description": f"今日{name}，是{season}季的重要节气。",
@@ -149,16 +149,16 @@ async def get_solar_term(date_str: str) -> dict | None:
     jq_name = JIEQI_NAMES[jq_index]
     season = _SEASON_MAP.get(jq_name, "")
 
-    # 尝试用 GPT 生成丰富内容
-    gpt_data = await _generate_via_gpt(jq_name, date_str, season)
+    # 尝试用 LLM 生成丰富内容
+    llm_data = await _generate_via_llm(jq_name, date_str, season)
 
-    if gpt_data:
-        print(f"    ✨ GPT 动态生成节气内容")
+    if llm_data:
+        print(f"    ✨ LLM 动态生成节气内容")
         return {
             "name": jq_name,
             "date": date_str,
             "season": season,
-            **gpt_data,
+            **llm_data,
         }
     else:
         print(f"    📋 回退到基础节气信息")

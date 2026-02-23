@@ -1,9 +1,9 @@
 """诗词内容生成模块
 
-从 GPT 返回的诗词数据构建 Markdown（NotebookLM source）、
+从 LLM 返回的诗词数据构建 Markdown（NotebookLM source）、
 Instagram 文案和 Telegram 消息文案。
 
-注意：infographic prompt 由 GPT 动态生成，不在此模块中构建。
+注意：infographic prompt 由 LLM 动态生成，不在此模块中构建。
 """
 
 from pathlib import Path

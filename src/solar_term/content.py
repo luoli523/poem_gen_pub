@@ -2,7 +2,7 @@
 
 生成节气相关的 Markdown（NotebookLM source）、
 Instagram 文案和 Telegram 消息文案。
-infographic prompt 由 GPT 在 detector.py 中动态生成。
+infographic prompt 由 LLM 在 detector.py 中动态生成。
 """
 
 from pathlib import Path

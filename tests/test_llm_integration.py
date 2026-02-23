@@ -1,4 +1,4 @@
-"""Integration tests for OpenAI-dependent modules with mocked API."""
+"""Integration tests for LLM-dependent modules with mocked API."""
 
 import json
 import pytest
@@ -38,9 +38,20 @@ MOCK_POEM_NO_MATCH = {
     "infographic_prompt": "",
 }
 
+MOCK_RANDOM_POEM_RESPONSE = {
+    "title": "春望",
+    "author": "杜甫",
+    "dynasty": "唐",
+    "full_text": "国破山河在，城春草木深。感时花溅泪，恨别鸟惊心。",
+    "meaning": "这首诗写于安史之乱期间...",
+    "customs": ["春日登高", "怀古"],
+    "occasion": "春日即景",
+    "infographic_prompt": "生成一张中国风信息图...",
+}
 
-def _mock_openai_response(content: dict):
-    """Build a mock OpenAI ChatCompletion response."""
+
+def _mock_llm_response(content: dict):
+    """Build a mock LLM ChatCompletion response (OpenAI-compatible format)."""
     mock_message = MagicMock()
     mock_message.content = json.dumps(content, ensure_ascii=False)
 
@@ -62,11 +73,11 @@ class TestSolarTermDetector:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_solar_term_with_gpt(self, monkeypatch):
-        """When GPT returns valid data, it should be merged into result."""
+    async def test_solar_term_with_llm(self, monkeypatch):
+        """When LLM returns valid data, it should be merged into result."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
-        mock_create = AsyncMock(return_value=_mock_openai_response(MOCK_SOLAR_TERM_RESPONSE))
+        mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_SOLAR_TERM_RESPONSE))
         mock_client_instance = MagicMock()
         mock_client_instance.chat.completions.create = mock_create
 
@@ -81,8 +92,8 @@ class TestSolarTermDetector:
             assert isinstance(result["customs"], list)
 
     @pytest.mark.asyncio
-    async def test_solar_term_gpt_failure_falls_back(self, monkeypatch):
-        """When GPT fails, fallback data should be used."""
+    async def test_solar_term_llm_failure_falls_back(self, monkeypatch):
+        """When LLM fails, fallback data should be used."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
         mock_create = AsyncMock(side_effect=Exception("API error"))
@@ -110,7 +121,7 @@ class TestPoetryDetector:
     async def test_poem_found(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
-        mock_create = AsyncMock(return_value=_mock_openai_response(MOCK_POEM_RESPONSE))
+        mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_POEM_RESPONSE))
         mock_client_instance = MagicMock()
         mock_client_instance.chat.completions.create = mock_create
 
@@ -124,10 +135,14 @@ class TestPoetryDetector:
         assert result["date"] == "2026-02-18"
 
     @pytest.mark.asyncio
-    async def test_no_poem_match(self, monkeypatch):
+    async def test_no_match_falls_back_to_random(self, monkeypatch):
+        """When no date-related poem, should fall back to random recommendation."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
-        mock_create = AsyncMock(return_value=_mock_openai_response(MOCK_POEM_NO_MATCH))
+        mock_create = AsyncMock(side_effect=[
+            _mock_llm_response(MOCK_POEM_NO_MATCH),
+            _mock_llm_response(MOCK_RANDOM_POEM_RESPONSE),
+        ])
         mock_client_instance = MagicMock()
         mock_client_instance.chat.completions.create = mock_create
 
@@ -135,10 +150,13 @@ class TestPoetryDetector:
             from src.poetry.detector import get_poem
             result = await get_poem("2026-03-15")
 
-        assert result is None
+        assert result is not None
+        assert result["title"] == "春望"
+        assert result["occasion"] == "春日即景"
+        assert mock_create.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_gpt_error_returns_none(self, monkeypatch):
+    async def test_llm_error_returns_none(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
         mock_create = AsyncMock(side_effect=Exception("timeout"))
@@ -177,7 +195,7 @@ class TestPoetryDetector:
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         content = {**MOCK_POEM_RESPONSE, "customs": "踏春"}
 
-        mock_create = AsyncMock(return_value=_mock_openai_response(content))
+        mock_create = AsyncMock(return_value=_mock_llm_response(content))
         mock_client_instance = MagicMock()
         mock_client_instance.chat.completions.create = mock_create
 
@@ -190,19 +208,19 @@ class TestPoetryDetector:
 
 
 class TestPoetryExtraContext:
-    """Test the context builder that feeds GPT."""
+    """Test the context builder that feeds LLM."""
 
     def test_lunar_date_included(self):
         from src.poetry.detector import _build_extra_context
         ctx = _build_extra_context("2026-02-18")
         assert "农历" in ctx
 
-    def test_fixed_holiday_detected(self):
+    def test_solar_term_included(self):
         from src.poetry.detector import _build_extra_context
-        ctx = _build_extra_context("2026-01-01")
-        assert "元旦" in ctx
+        ctx = _build_extra_context("2026-02-18")
+        assert "节气" in ctx or "农历" in ctx
 
-    def test_normal_day(self):
+    def test_invalid_date_returns_empty(self):
         from src.poetry.detector import _build_extra_context
-        ctx = _build_extra_context("2026-03-15")
-        assert ctx  # should never be empty
+        ctx = _build_extra_context("not-a-date")
+        assert ctx == ""

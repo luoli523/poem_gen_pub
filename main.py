@@ -1,7 +1,7 @@
 """古诗词与节气内容生成系统
 
 主流程：节气检测 → 节气 infographic → 推送 Telegram → 发布 Instagram
-     → 诗词检测（GPT）→ 诗词 infographic → 推送 Telegram → 发布 Instagram
+     → 诗词检测（LLM）→ 诗词 infographic → 推送 Telegram → 发布 Instagram
 """
 
 import asyncio
@@ -38,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="古诗词与节气内容生成系统")
     parser.add_argument("--no-nlm", action="store_true", help="跳过 NotebookLM 生成流程")
     parser.add_argument("--no-ig", action="store_true", help="跳过 Instagram 发布")
-    parser.add_argument("--no-poetry", action="store_true", help="跳过诗词模块（不调用 GPT）")
+    parser.add_argument("--no-poetry", action="store_true", help="跳过诗词模块（不调用 LLM）")
     return parser.parse_args()
 
 
@@ -79,7 +79,7 @@ async def _run_content_pipeline(
     # 2. NotebookLM 生成 infographic
     prompt = data.get("infographic_prompt", "")
     if not prompt:
-        print(f"  ⚠ GPT 未返回{label} infographic prompt，跳过 infographic 生成")
+        print(f"  ⚠ LLM 未返回{label} infographic prompt，跳过 infographic 生成")
         return
 
     image = await nlm_run_pipeline(
@@ -207,7 +207,7 @@ async def main():
     else:
         print(f"\n🌿 今日非节气日，跳过节气内容生成")
 
-    # ── 2. 诗词检测（GPT 动态匹配）与内容生成 ──
+    # ── 2. 诗词检测（LLM 动态匹配）与内容生成 ──
     if solar_term and not skip_notebooklm:
         print("\n⏳ 等待 30s 后继续（避免 NotebookLM 限流）...")
         await asyncio.sleep(30)
@@ -215,7 +215,7 @@ async def main():
     if args.no_poetry:
         print(f"\n📜 跳过诗词模块（--no-poetry）")
     else:
-        print(f"\n📜 正在调用 GPT 检测今日诗词...")
+        print(f"\n📜 正在调用 LLM 获取今日诗词...")
         poem = await get_poem(today)
         if poem:
             occasion = poem.get("occasion", "诗词")
@@ -233,7 +233,7 @@ async def main():
                 artifact_name=f"诗词_{occasion}_{today}",
             )
         else:
-            print(f"📜 今日无匹配诗词，跳过")
+            print(f"📜 诗词获取失败，跳过")
 
     print("\n✅ 全部完成！")
 
