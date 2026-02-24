@@ -11,6 +11,13 @@ from notebooklm import NotebookLMClient, InfographicOrientation, InfographicDeta
 
 NOTEBOOK_TITLE = "poem_solar_term"
 
+RATIO_TO_ORIENTATION = {
+    "4:5": InfographicOrientation.PORTRAIT,
+    "9:16": InfographicOrientation.PORTRAIT,
+    "1:1": InfographicOrientation.SQUARE,
+    "16:9": InfographicOrientation.LANDSCAPE,
+}
+
 
 async def check_auth() -> bool:
     """检测 NotebookLM 认证是否有效。
@@ -69,6 +76,7 @@ async def create_infographic_with_retry(
     notebook_id: str,
     source_id: str,
     prompt: str,
+    orientation: InfographicOrientation = InfographicOrientation.PORTRAIT,
     max_retries: int = 3,
 ):
     """创建 infographic，带重试逻辑。
@@ -82,7 +90,7 @@ async def create_infographic_with_retry(
                 notebook_id,
                 source_ids=[source_id],
                 instructions=prompt,
-                orientation=InfographicOrientation.PORTRAIT,
+                orientation=orientation,
                 detail_level=InfographicDetail.DETAILED,
                 language="zh",
             )
@@ -108,6 +116,7 @@ async def run_pipeline(
     prompt: str,
     artifact_name: str,
     output_dir: str,
+    ratio: str = "4:5",
 ) -> str | None:
     """通用 NotebookLM pipeline：上传 Markdown → 生成 infographic → 下载
 
@@ -117,6 +126,7 @@ async def run_pipeline(
         prompt: infographic 生成 prompt
         artifact_name: 生成物命名
         output_dir: 输出目录
+        ratio: 长宽比例（"4:5"、"9:16"、"1:1"、"16:9"），默认 "4:5"
 
     Returns:
         生成的图片文件路径，失败返回 None
@@ -134,8 +144,9 @@ async def run_pipeline(
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
+        orientation = RATIO_TO_ORIENTATION.get(ratio, InfographicOrientation.PORTRAIT)
         status = await create_infographic_with_retry(
-            client, notebook_id, source_id, prompt,
+            client, notebook_id, source_id, prompt, orientation=orientation,
         )
         if not status:
             print(f"    ❌ {label} infographic 创建失败")

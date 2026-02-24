@@ -154,6 +154,44 @@ RANDOM_POEM_USER_TEMPLATE = """\
 {extra_context}
 请随机推荐一首适合今天阅读的经典诗词。"""
 
+# ── 自定义诗词 Prompt ──
+
+CUSTOM_POEM_SYSTEM_PROMPT = """\
+你是一位中国古典文学专家。给定一首诗词的名称或关键词，
+请返回该诗词的完整结构化信息。
+
+要求：
+1. 诗词全文必须完整准确，不得删减或篡改
+2. 如果关键词能匹配多首诗词，选择最著名的那一首
+3. 赏析要通俗易懂，300-500字，兼顾文学性和科普性
+4. customs 字段填写与诗词主题相关的文化知识（3-5条，每条30-60字）
+5. occasion 字段简要概括诗词的主题场景（如"中秋望月"、"送别友人"、"春日即景"）
+
+你还需要生成一段用于 NotebookLM 生成信息图的 prompt（infographic_prompt 字段）。
+生成 infographic_prompt 时请遵循以下视觉风格指引：
+- 中国古典书画风（水墨/工笔）与现代信息图融合
+- 诗词全文以书法形式呈现，作为视觉焦点
+- 配合诗词意境的插画元素
+- 包含诗词赏析摘要和文化知识的信息区块
+- 整体配色契合诗词的季节和情感基调
+- 印章、窗棂、山水等中国传统元素作为点缀
+- 竖版排版（PORTRAIT），印刷级清晰度，典雅精致
+- infographic_prompt 应为完整的、可直接提交给信息图生成工具的指令，300-500字
+
+你必须以严格的 JSON 格式返回，schema 如下：
+{
+  "title": string,
+  "author": string,
+  "dynasty": string,
+  "full_text": string,
+  "occasion": string,
+  "meaning": string,
+  "customs": [string],
+  "infographic_prompt": string
+}"""
+
+CUSTOM_POEM_USER_TEMPLATE = "请提供诗词「{name}」的完整信息。"
+
 # ── User Prompt Template ──
 
 USER_PROMPT_TEMPLATE = """\
@@ -315,4 +353,52 @@ async def get_poem(date_str: str) -> dict | None:
         return None
     except Exception as e:
         print(f"  ⚠ 诗词检测出错: {type(e).__name__}: {e}")
+        return None
+
+
+async def get_poem_by_name(name: str, date_str: str) -> dict | None:
+    """根据用户指定的诗词名称/关键词，调用 LLM 获取完整诗词数据。
+
+    Args:
+        name: 诗词名称或关键词（如 "静夜思"、"水调歌头"）
+        date_str: 日期字符串（YYYY-MM-DD），用于填充 date 字段
+
+    Returns:
+        诗词信息字典，或 None
+    """
+    from src.common.config import get_llm_config
+    llm = get_llm_config()
+    if not llm["api_key"]:
+        return None
+
+    try:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=llm["api_key"], base_url=llm.get("base_url"))
+        response = await client.chat.completions.create(
+            model=llm["model"],
+            messages=[
+                {"role": "system", "content": CUSTOM_POEM_SYSTEM_PROMPT},
+                {"role": "user", "content": CUSTOM_POEM_USER_TEMPLATE.format(name=name)},
+            ],
+            response_format={"type": "json_object"},
+            max_completion_tokens=llm["max_completion_tokens"],
+        )
+
+        content = response.choices[0].message.content
+        if not content:
+            print("  ⚠ LLM 返回为空")
+            return None
+
+        data = json.loads(content)
+        return _validate_and_normalize(data, date_str)
+
+    except ImportError:
+        print("  ⚠ openai 库未安装，无法使用诗词模块")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"  ⚠ LLM 返回 JSON 解析失败: {e}")
+        return None
+    except Exception as e:
+        print(f"  ⚠ 自定义诗词获取出错: {type(e).__name__}: {e}")
         return None

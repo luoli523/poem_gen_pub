@@ -27,7 +27,7 @@ from src.solar_term.content import (
 )
 
 # ── 诗词模块 ──
-from src.poetry.detector import get_poem
+from src.poetry.detector import get_poem, get_poem_by_name
 from src.poetry.content import (
     generate_markdown as poetry_generate_markdown,
     build_ig_caption as poetry_build_ig_caption,
@@ -38,7 +38,16 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="古诗词与节气内容生成系统")
     parser.add_argument("--no-nlm", action="store_true", help="跳过 NotebookLM 生成流程")
     parser.add_argument("--no-ig", action="store_true", help="跳过 Instagram 发布")
-    parser.add_argument("--no-poetry", action="store_true", help="跳过诗词模块（不调用 LLM）")
+
+    poem_group = parser.add_mutually_exclusive_group()
+    poem_group.add_argument("--no-poetry", action="store_true", help="跳过诗词模块（不调用 LLM）")
+    poem_group.add_argument("--poem", type=str, default=None,
+                            help="指定诗词名称或关键词（如 '静夜思'、'水调歌头'）")
+
+    parser.add_argument("--ratio", type=str, default="4:5",
+                        choices=["4:5", "9:16", "1:1", "16:9"],
+                        help="信息图长宽比例（默认 4:5）")
+
     return parser.parse_args()
 
 
@@ -62,6 +71,7 @@ async def _run_content_pipeline(
     build_caption_fn: Callable[[dict], str],
     md_filename: str,
     artifact_name: str,
+    ratio: str = "4:5",
 ):
     """通用内容管线：生成 Markdown → NotebookLM infographic → Telegram → Instagram"""
 
@@ -72,14 +82,24 @@ async def _run_content_pipeline(
     md_file.write_text(md_content, encoding="utf-8")
     print(f"  📄 {label} Markdown: {md_file}")
 
+    # 输出 infographic prompt 全文并保存到文件
+    prompt = data.get("infographic_prompt", "")
+    if prompt:
+        prompt_file = md_file.with_suffix(".prompt.txt")
+        prompt_file.write_text(prompt, encoding="utf-8")
+        print(f"  🖼 {label} Infographic Prompt: {prompt_file}")
+        print(f"{'─' * 60}")
+        print(prompt)
+        print(f"{'─' * 60}")
+    else:
+        print(f"  ⚠ LLM 未返回{label} infographic prompt")
+
     if skip_notebooklm:
         print("  ⏭ 跳过 NotebookLM（--no-nlm）")
         return
 
     # 2. NotebookLM 生成 infographic
-    prompt = data.get("infographic_prompt", "")
     if not prompt:
-        print(f"  ⚠ LLM 未返回{label} infographic prompt，跳过 infographic 生成")
         return
 
     image = await nlm_run_pipeline(
@@ -88,6 +108,7 @@ async def _run_content_pipeline(
         prompt=prompt,
         artifact_name=artifact_name,
         output_dir=str(output_dir),
+        ratio=ratio,
     )
 
     if not image:
@@ -203,6 +224,7 @@ async def main():
             build_caption_fn=solar_term_build_ig_caption,
             md_filename=f"solar_term_{solar_term['name']}_{today}.md",
             artifact_name=f"{solar_term['name']}_{today}",
+            ratio=args.ratio,
         )
     else:
         print(f"\n🌿 今日非节气日，跳过节气内容生成")
@@ -214,6 +236,27 @@ async def main():
 
     if args.no_poetry:
         print(f"\n📜 跳过诗词模块（--no-poetry）")
+    elif args.poem:
+        print(f"\n📜 正在获取指定诗词：「{args.poem}」...")
+        poem = await get_poem_by_name(args.poem, today)
+        if poem:
+            print(f"📜 诗词：《{poem['title']}》（{poem['dynasty']}·{poem['author']}）")
+            occasion = poem.get("occasion", "自选诗词")
+            await _run_content_pipeline(
+                label="诗词",
+                data=poem,
+                today=today,
+                output_dir=output_dir,
+                skip_notebooklm=skip_notebooklm,
+                skip_ig=args.no_ig,
+                generate_markdown_fn=poetry_generate_markdown,
+                build_caption_fn=poetry_build_ig_caption,
+                md_filename=f"poetry_{poem['title']}_{today}.md",
+                artifact_name=f"诗词_{poem['title']}_{today}",
+                ratio=args.ratio,
+            )
+        else:
+            print(f"📜 诗词「{args.poem}」获取失败，跳过")
     else:
         print(f"\n📜 正在调用 LLM 获取今日诗词...")
         poem = await get_poem(today)
@@ -231,6 +274,7 @@ async def main():
                 build_caption_fn=poetry_build_ig_caption,
                 md_filename=f"poetry_{occasion}_{today}.md",
                 artifact_name=f"诗词_{occasion}_{today}",
+                ratio=args.ratio,
             )
         else:
             print(f"📜 诗词获取失败，跳过")
