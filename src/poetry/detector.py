@@ -47,14 +47,20 @@ def _save_to_history(poem: dict) -> None:
     )
 
 
-def _format_history_for_prompt(history: list[dict]) -> str:
-    """将历史记录格式化为 prompt 中的排除列表。"""
+def _format_exclusion_block(history: list[dict]) -> str:
+    """将历史记录格式化为注入 system prompt 的强制排除块。"""
     if not history:
         return ""
     titles = [f"「{r['title']}」({r['author']})" for r in history if r.get("title")]
     if not titles:
         return ""
-    return "\n\n⚠ 以下诗词近期已被选过，请务必避开：\n" + "、".join(titles)
+    return (
+        "\n\n【强制排除——最高优先级】\n"
+        "以下诗词近期已被推送过，绝对不能再次选择，即使它与今天最为匹配：\n"
+        + "、".join(titles) + "\n"
+        "如果今天最合适的诗词恰好在排除列表中，请选择同场景的次佳作品；"
+        "若实在无其他合适选项，返回 has_poem: false。"
+    )
 
 
 # ── System Prompt ──
@@ -294,17 +300,16 @@ async def get_poem(date_str: str) -> dict | None:
         client = AsyncOpenAI(api_key=llm["api_key"], base_url=llm.get("base_url"))
 
         history = _load_history()
-        history_hint = _format_history_for_prompt(history)
+        exclusion_block = _format_exclusion_block(history)
 
-        # 第一步：尝试匹配日期关联诗词
-        user_msg = USER_PROMPT_TEMPLATE.format(
-            date=date_str, weekday=weekday, extra_context=extra_context,
-        ) + history_hint
+        # 第一步：尝试匹配日期关联诗词（排除列表注入 system prompt）
         response = await client.chat.completions.create(
             model=llm["model"],
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
+                {"role": "system", "content": SYSTEM_PROMPT + exclusion_block},
+                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(
+                    date=date_str, weekday=weekday, extra_context=extra_context,
+                )},
             ],
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
@@ -319,16 +324,15 @@ async def get_poem(date_str: str) -> dict | None:
                     _save_to_history(result)
                     return result
 
-        # 第二步：无匹配，随机推荐一首
+        # 第二步：无匹配，随机推荐一首（排除列表同样注入 system prompt）
         print("  📝 无日期关联诗词，随机推荐...")
-        user_msg = RANDOM_POEM_USER_TEMPLATE.format(
-            date=date_str, weekday=weekday, extra_context=extra_context,
-        ) + history_hint
         response = await client.chat.completions.create(
             model=llm["model"],
             messages=[
-                {"role": "system", "content": RANDOM_POEM_SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
+                {"role": "system", "content": RANDOM_POEM_SYSTEM_PROMPT + exclusion_block},
+                {"role": "user", "content": RANDOM_POEM_USER_TEMPLATE.format(
+                    date=date_str, weekday=weekday, extra_context=extra_context,
+                )},
             ],
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],

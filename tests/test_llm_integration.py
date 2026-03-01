@@ -227,20 +227,20 @@ class TestPoemHistory:
         _HISTORY_PATH.write_text(json.dumps(old), encoding="utf-8")
         assert _load_history(days=90) == []
 
-    def test_format_history_for_prompt(self):
-        from src.poetry.detector import _format_history_for_prompt
+    def test_format_exclusion_block(self):
+        from src.poetry.detector import _format_exclusion_block
         history = [
             {"title": "静夜思", "author": "李白", "date": "2026-02-20"},
             {"title": "春望", "author": "杜甫", "date": "2026-02-21"},
         ]
-        text = _format_history_for_prompt(history)
+        text = _format_exclusion_block(history)
         assert "静夜思" in text
         assert "春望" in text
-        assert "避开" in text
+        assert "强制排除" in text
 
-    def test_format_history_empty(self):
-        from src.poetry.detector import _format_history_for_prompt
-        assert _format_history_for_prompt([]) == ""
+    def test_format_exclusion_block_empty(self):
+        from src.poetry.detector import _format_exclusion_block
+        assert _format_exclusion_block([]) == ""
 
     @pytest.mark.asyncio
     async def test_poem_saved_to_history(self, monkeypatch):
@@ -260,8 +260,8 @@ class TestPoemHistory:
         assert history[0]["title"] == "春夜喜雨"
 
     @pytest.mark.asyncio
-    async def test_history_passed_to_prompt(self, monkeypatch):
-        """History titles should appear in the user message sent to LLM."""
+    async def test_history_injected_into_system_prompt(self, monkeypatch):
+        """History exclusion block should appear in the system message sent to LLM."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         from src.poetry.detector import _save_to_history
         _save_to_history({"title": "静夜思", "author": "李白", "date": "2026-02-20"})
@@ -274,8 +274,9 @@ class TestPoemHistory:
             from src.poetry.detector import get_poem
             await get_poem("2026-02-21")
 
-        user_msg = mock_create.call_args[1]["messages"][1]["content"]
-        assert "静夜思" in user_msg
+        system_msg = mock_create.call_args[1]["messages"][0]["content"]
+        assert "静夜思" in system_msg
+        assert "强制排除" in system_msg
 
 
 class TestPoetryExtraContext:
