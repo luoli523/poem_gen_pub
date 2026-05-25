@@ -2,6 +2,7 @@
 
 import json
 import pytest
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
@@ -212,8 +213,10 @@ class TestPoemHistory:
 
     def test_save_and_load_history(self):
         from src.poetry.detector import _save_to_history, _load_history
-        _save_to_history({"title": "静夜思", "author": "李白", "date": "2026-02-20"})
-        _save_to_history({"title": "春望", "author": "杜甫", "date": "2026-02-21"})
+        date_1 = datetime.now().strftime("%Y-%m-%d")
+        date_2 = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        _save_to_history({"title": "静夜思", "author": "李白", "date": date_1})
+        _save_to_history({"title": "春望", "author": "杜甫", "date": date_2})
         history = _load_history()
         assert len(history) == 2
         assert history[0]["title"] == "静夜思"
@@ -246,6 +249,7 @@ class TestPoemHistory:
     async def test_poem_saved_to_history(self, monkeypatch):
         """After a successful poem selection, it should be saved to history."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        today = datetime.now().strftime("%Y-%m-%d")
 
         mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_POEM_RESPONSE))
         mock_client_instance = MagicMock()
@@ -253,7 +257,7 @@ class TestPoemHistory:
 
         with patch("openai.AsyncOpenAI", return_value=mock_client_instance):
             from src.poetry.detector import get_poem, _load_history
-            await get_poem("2026-02-18")
+            await get_poem(today)
             history = _load_history()
 
         assert len(history) == 1
@@ -264,7 +268,9 @@ class TestPoemHistory:
         """History exclusion block should appear in the system message sent to LLM."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         from src.poetry.detector import _save_to_history
-        _save_to_history({"title": "静夜思", "author": "李白", "date": "2026-02-20"})
+        today = datetime.now().strftime("%Y-%m-%d")
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        _save_to_history({"title": "静夜思", "author": "李白", "date": today})
 
         mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_POEM_RESPONSE))
         mock_client_instance = MagicMock()
@@ -272,7 +278,7 @@ class TestPoemHistory:
 
         with patch("openai.AsyncOpenAI", return_value=mock_client_instance):
             from src.poetry.detector import get_poem
-            await get_poem("2026-02-21")
+            await get_poem(tomorrow)
 
         system_msg = mock_create.call_args[1]["messages"][0]["content"]
         assert "静夜思" in system_msg
