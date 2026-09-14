@@ -10,3 +10,4 @@ site/resources/
 *.egg-info/
 dist/
 build/
+site/.hugo_build.lock

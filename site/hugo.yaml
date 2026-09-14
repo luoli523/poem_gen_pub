@@ -1,0 +1,64 @@
+baseURL: "https://luoli523.github.io/poem_gen_pub/"
+languageCode: zh-cn
+defaultContentLanguage: zh-cn
+title: 诗词背后
+theme: hextra
+enableRobotsTXT: true
+enableGitInfo: false
+hasCJKLanguage: true
+buildFuture: true   # 流水线在 UTC 23:00 以北京日期落页，对 UTC 构建来说是"未来"
+
+# 分类维度：每首诗的 frontmatter 写入这些字段，Hugo 自动生成聚合索引页
+taxonomies:
+  author: authors
+  dynasty: dynasties
+  occasion: occasions
+  category: categories
+  kind: kinds
+  pivot_type: pivot_types
+
+menu:
+  main:
+    - name: 诗词
+      pageRef: /poems
+      weight: 1
+    - name: 作者
+      pageRef: /authors
+      weight: 2
+    - name: 朝代
+      pageRef: /dynasties
+      weight: 3
+    - name: 场景
+      pageRef: /occasions
+      weight: 4
+    - name: 素材分类
+      pageRef: /categories
+      weight: 5
+    - name: 搜索
+      weight: 9
+      params:
+        type: search
+
+params:
+  dateFormat: "2006年1月2日"
+  description: 每日一首古诗词，以及它背后的人、事、风土与传说——写作素材的积累
+  navbar:
+    displayTitle: true
+    displayLogo: false
+  footer:
+    displayCopyright: false
+    displayPoweredBy: false
+  search:
+    enable: true
+    type: flexsearch
+    flexsearch:
+      index: content
+      tokenize: forward      # 中文按前向分词，能命中词内子串
+  blog:
+    list:
+      displayTags: true
+  page:
+    width: normal
+  theme:
+    default: system
+    displayToggle: true

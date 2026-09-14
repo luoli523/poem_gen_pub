@@ -21,6 +21,18 @@
 诗词检测（LLM）→ 背后的故事（LLM）→ 站点内容页 → 生成诗词 Markdown → NotebookLM infographic → Telegram → Instagram
 ```
 
+## 网站
+
+内容页积累在 `site/content/poems/`，由 Hugo（Hextra 主题）构建，每日流水线完成后自动发布到
+<https://luoli523.github.io/poem_gen_pub/>。可按作者 / 朝代 / 场景 / 素材分类 / 可信度浏览，支持全文搜索。
+
+本地预览：
+
+```bash
+git submodule update --init
+hugo --source site server
+```
+
 ## 快速开始
 
 ### 1. 安装依赖

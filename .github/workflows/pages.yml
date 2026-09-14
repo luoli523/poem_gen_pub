@@ -1,0 +1,64 @@
+name: 发布站点到 GitHub Pages
+
+on:
+  # 每日流水线跑完（内容已提交回 main）后构建；不能用 on.push——GITHUB_TOKEN 的 push 不触发 push 事件
+  workflow_run:
+    workflows: ["每日诗词节气内容生成"]
+    types: [completed]
+    branches: [main]
+  # 手动修改站点配置 / 主题时
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".gitmodules"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: true
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: "latest"
+          extended: true
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build
+        run: hugo --source site --gc --minify --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
