@@ -13,3 +13,11 @@ output:
 # 站点内容（Hugo 内容页，每日诗词 + 背后的故事，提交回 repo 持续积累）
 site:
   content_dir: "./site/content/poems"
+
+# 衍生一则（从诗中任一点跳出去的叙事故事）
+# 材料来源问题未解决前默认关闭；可单独指定模型做对比实验
+tale:
+  enabled: false
+  # model: "deepseek-chat"                 # 不填则沿用上面 openai.model
+  # api_key_env: "DEEPSEEK_API_KEY"        # 从哪个环境变量读 key；不填则沿用主 key
+  # base_url: "https://api.deepseek.com"   # 与 api_key_env 配套

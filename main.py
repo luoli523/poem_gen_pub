@@ -159,7 +159,7 @@ async def _run_content_pipeline(
 # ── 诗词故事 + 站点内容页 ──
 
 
-async def _write_poem_site_page(poem: dict, site_dir: Path) -> None:
+async def _write_poem_site_page(poem: dict, site_dir: Path, tale_enabled: bool) -> None:
     """生成诗词背后的故事，写入 Hugo 内容页（故事失败时仍写入仅含诗词的页面）。"""
     print("\n📖 正在生成诗词背后的故事...")
     story = await get_story(poem)
@@ -169,13 +169,17 @@ async def _write_poem_site_page(poem: dict, site_dir: Path) -> None:
     else:
         print("  ⚠ 故事生成失败，内容页将不含故事")
 
-    print("📚 正在生成衍生一则...")
-    tale = await get_tale(poem, story, recent_pivot_types())
-    if tale:
-        print(f"  ✅ 衍生一则：《{tale['title']}》—— 自「{tale['pivot']}」（{tale['pivot_type']}）衍生")
-        record_pivot_type(poem, tale["pivot_type"])
+    tale = None
+    if tale_enabled:
+        print("📚 正在生成衍生一则...")
+        tale = await get_tale(poem, story, recent_pivot_types())
+        if tale:
+            print(f"  ✅ 衍生一则：《{tale['title']}》—— 自「{tale['pivot']}」（{tale['pivot_type']}）衍生")
+            record_pivot_type(poem, tale["pivot_type"])
+        else:
+            print("  ⚠ 衍生故事生成失败，内容页将不含此节")
     else:
-        print("  ⚠ 衍生故事生成失败，内容页将不含此节")
+        print("  ⏭ 衍生一则已关闭（config tale.enabled）")
 
     page_file = site_dir / poetry_site_page_filename(poem)
     page_file.parent.mkdir(parents=True, exist_ok=True)
@@ -218,6 +222,7 @@ async def main():
     output_dir = Path(config["output"]["dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     site_dir = Path(config["site"]["content_dir"])
+    tale_enabled = bool(config.get("tale", {}).get("enabled", False))
 
     # NotebookLM 认证检测
     nlm_auth_failed = False
@@ -275,7 +280,7 @@ async def main():
         if poem:
             print(f"📜 诗词：《{poem['title']}》（{poem['dynasty']}·{poem['author']}）")
             occasion = poem.get("occasion", "自选诗词")
-            await _write_poem_site_page(poem, site_dir)
+            await _write_poem_site_page(poem, site_dir, tale_enabled)
             await _run_content_pipeline(
                 label="诗词",
                 data=poem,
@@ -297,7 +302,7 @@ async def main():
         if poem:
             occasion = poem.get("occasion", "诗词")
             print(f"📜 今日诗词：《{poem['title']}》（{poem['dynasty']}·{poem['author']}）— {occasion}")
-            await _write_poem_site_page(poem, site_dir)
+            await _write_poem_site_page(poem, site_dir, tale_enabled)
             await _run_content_pipeline(
                 label="诗词",
                 data=poem,
