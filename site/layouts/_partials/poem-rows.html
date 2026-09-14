@@ -1,0 +1,11 @@
+{{/* 书目式列表：日期 ｜ 题 ｜ 朝代·作者 ｜ 场景 */}}
+<ol class="catalog">
+{{ range . }}
+  <li>
+    <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "1月2日" }}<small>{{ .Date.Format "2006" }}</small></time>
+    <a class="t" href="{{ .RelPermalink }}">{{ .Title }}</a>
+    <span class="who">{{ .Params.dynasty }}·{{ .Params.author }}</span>
+    <span class="occ">{{ .Params.occasion }}</span>
+  </li>
+{{ end }}
+</ol>

@@ -1,0 +1,18 @@
+{{ define "main" }}
+<main id="main" class="search">
+  <h1>搜索</h1>
+  <link rel="stylesheet" href="{{ "pagefind/pagefind-ui.css" | relURL }}">
+  <script src="{{ "pagefind/pagefind-ui.js" | relURL }}"></script>
+  <div id="search"></div>
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      new PagefindUI({
+        element: '#search', showImages: false, showSubResults: true,
+        translations: { placeholder: '诗题、作者、字句、出处……', clear_search: '清除', load_more: '更多结果',
+          zero_results: '没有找到「[SEARCH_TERM]」', many_results: '「[SEARCH_TERM]」有 [COUNT] 条结果', one_result: '「[SEARCH_TERM]」有 1 条结果',
+          searching: '搜索中……' }
+      });
+    });
+  </script>
+</main>
+{{ end }}

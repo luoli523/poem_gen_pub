@@ -1,0 +1,157 @@
+/* 诗词背后 —— 版式取自宋版书：界行、版心、眉批、卷首竖题、卷末一印 */
+
+:root {
+  --paper: #e8e7e1;      /* 竹纸：偏冷灰 */
+  --paper-2: #dfdfd8;    /* 略深一档，做印章底、表格隔行 */
+  --ink: #1e2230;        /* 松烟墨：蓝黑 */
+  --ink-2: #6a6f7d;      /* 淡墨 */
+  --rule: #c6c5bc;       /* 界行 */
+  --indigo: #2e4a7b;     /* 靛：链接与交互 */
+  --cinnabar: #b4402c;   /* 朱砂：只给印 */
+  --kai: "LXGW WenKai", "Kaiti SC", "KaiTi", "STKaiti", serif;
+  --song: "Noto Serif SC", "Songti SC", "SimSun", "Source Han Serif SC", serif;
+  --measure: 34em;       /* 正文行长上限 */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1b1d24; --paper-2: #23262f;
+    --ink: #d9d8d0; --ink-2: #9a9ea9;
+    --rule: #3a3d47; --indigo: #8fa6d1; --cinnabar: #c9573f;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { color-scheme: light dark; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 17px/1.95 var(--song); font-feature-settings: "palt";
+  -webkit-text-size-adjust: 100%;
+  padding-inline: clamp(1rem, 4vw, 3rem);
+}
+a { color: var(--indigo); text-decoration: none; text-underline-offset: .2em; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--indigo); outline-offset: 3px; }
+img { max-width: 100%; height: auto; display: block; }
+h1, h2, h3 { font-weight: 600; line-height: 1.4; margin: 0; }
+small { font-weight: 400; color: var(--ink-2); }
+.skip { position: absolute; left: -999px; top: 0; background: var(--paper); padding: .5em 1em; }
+.skip:focus { left: 1rem; z-index: 10; }
+
+/* ── 版头 ── */
+.masthead {
+  max-width: 72rem; margin: 0 auto; padding-block: 1.25rem .75rem;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 2rem;
+  border-bottom: 1px solid var(--rule);
+}
+.brand { font-family: var(--kai); font-size: 1.5rem; color: var(--ink); letter-spacing: .12em; }
+.masthead nav { display: flex; flex-wrap: wrap; gap: 0 1.4rem; margin-left: auto; }
+.masthead nav a { color: var(--ink-2); padding-block: .2em; }
+.masthead nav a[aria-current] { color: var(--ink); border-bottom: 2px solid var(--ink); }
+
+main { max-width: 72rem; margin: 0 auto; padding-block: 2.5rem 4rem; }
+.colophon { max-width: 72rem; margin: 0 auto; padding-block: 2rem 3rem; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: .9rem; }
+.colophon p { margin: 0; max-width: var(--measure); }
+
+/* ── 首页：今日一首 ── */
+.today { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: 3rem; align-items: start; }
+.today-fig img { border: 1px solid var(--rule); }
+.today-text .poem { margin-top: 0; max-width: 30em; font-size: 1.4rem; }
+.today-title { font-family: var(--kai); font-size: 2rem; font-weight: 400; margin-top: 1.5rem; }
+.today-title a { color: var(--ink); }
+.today-meta { color: var(--ink-2); margin: .25rem 0 1.5rem; }
+.today-meta span { margin-left: 1.4em; }
+.today-summary { max-width: var(--measure); }
+.more { display: inline-block; margin-top: .5rem; border-bottom: 1px solid currentColor; }
+.recent { margin-top: 4rem; }
+.recent h2, .listing h1, .index h1 { font-family: var(--kai); font-weight: 400; font-size: 1.6rem; margin-bottom: 1rem; }
+.listing h1 small, .index h1 small { font-family: var(--song); font-size: .95rem; margin-left: 1em; }
+.all { margin-top: 1.25rem; }
+.empty { color: var(--ink-2); }
+.crumb { margin: 0 0 .25rem; color: var(--ink-2); }
+
+/* ── 书目：日期 ｜ 题 ｜ 朝代·作者 ｜ 场景 ── */
+.catalog { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.catalog li {
+  display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 9em 10em; align-items: baseline;
+  border-bottom: 1px solid var(--rule); padding-block: .55em;
+}
+.catalog li > * { padding-inline: .9em; min-width: 0; }
+.catalog li > * + * { border-left: 1px solid var(--rule); }   /* 界行 */
+.catalog time { color: var(--ink-2); font-variant-numeric: tabular-nums; padding-left: 0; }
+.catalog time small { display: block; font-size: .75rem; line-height: 1.2; }
+.catalog .t { font-family: var(--kai); font-size: 1.2rem; color: var(--ink); }
+.catalog .who, .catalog .occ { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 索引：词条 + 数量 ── */
+.terms { list-style: none; margin: 0; padding: 0; columns: 14em; column-gap: 3rem; border-top: 1px solid var(--rule); }
+.terms li { display: flex; justify-content: space-between; gap: 1em; border-bottom: 1px solid var(--rule); padding-block: .45em; break-inside: avoid; }
+.terms a { color: var(--ink); font-family: var(--kai); font-size: 1.15rem; }
+.terms .n { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* ── 诗词页：书脊 ｜ 正文（含眉批栏） ── */
+.leaf { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0 3rem; }
+.spine { border-right: 1px solid var(--rule); padding-right: 1.5rem; position: sticky; top: 1.5rem; align-self: start;
+  display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
+.spine-title {
+  writing-mode: vertical-rl; text-orientation: upright;
+  font-family: var(--kai); font-weight: 400; font-size: 2rem; letter-spacing: .15em; line-height: 1;
+  color: var(--ink);
+}
+.spine-who, .spine-date, .spine-occ { margin: 0; writing-mode: vertical-rl; color: var(--ink-2); font-size: .9rem; letter-spacing: .1em; }
+.spine-date time { font-variant-numeric: tabular-nums; }
+.seal {
+  margin-top: .4rem; writing-mode: vertical-rl; text-orientation: upright;
+  font-family: var(--kai); font-size: 1rem; letter-spacing: .1em; line-height: 1.1;
+  color: var(--paper); background: var(--cinnabar); padding: .55em .35em; border-radius: 2px;
+}
+.seal:hover { text-decoration: none; filter: brightness(1.08); }
+
+.body { max-width: calc(var(--measure) + 12rem); }
+.body h2 { font-size: 1.05rem; color: var(--ink-2); font-weight: 600; letter-spacing: .1em; margin: 2.8rem 0 .9rem; }
+.body h3 { font-size: 1.05rem; font-weight: 600; margin: 1.8rem 0 .5rem; }
+.body p, .body ul, .body blockquote { max-width: var(--measure); }
+.body p { margin: 0 0 1em; }
+.body .poem { font-family: var(--kai); font-size: 1.55rem; line-height: 2.05; letter-spacing: .04em; max-width: none; margin-bottom: 1.5rem; }
+.body blockquote { margin: 0 0 1.5rem; padding-left: 1rem; border-left: 1px solid var(--rule); color: var(--ink-2); }
+.body ul { list-style: none; padding: 0; margin: 0 0 1em; }
+.body li { margin-bottom: .6em; }
+.body li:not(.noted)::before { content: "—"; color: var(--ink-2); margin-right: .5em; }
+.infographic { margin: 0 0 2.5rem; max-width: var(--measure); }
+.infographic img { border: 1px solid var(--rule); }
+.tail { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: .3em 1.6em; color: var(--ink-2); }
+
+/* 眉批：正文右侧一栏，界行相隔 */
+.body li.noted { display: grid; grid-template-columns: minmax(0, var(--measure)) 11rem; gap: 0 1rem; align-items: start; max-width: none; }
+.note { border-left: 1px solid var(--rule); padding-left: .8rem; font-size: .85rem; line-height: 1.7; color: var(--ink-2); }
+.note b { display: block; font-weight: 600; color: var(--ink); }
+.note[data-kind="存疑"] b, .note[data-kind="附会"] b { color: var(--ink-2); font-weight: 400; }
+.note[data-kind="存疑"]::before, .note[data-kind="附会"]::before { content: ""; }
+.note .src { display: block; }
+
+/* ── 搜索 ── */
+.search h1 { font-family: var(--kai); font-weight: 400; font-size: 1.6rem; margin-bottom: 1rem; }
+.search { --pagefind-ui-scale: .9; --pagefind-ui-primary: var(--indigo); --pagefind-ui-text: var(--ink);
+  --pagefind-ui-background: var(--paper); --pagefind-ui-border: var(--rule); --pagefind-ui-tag: var(--paper-2);
+  --pagefind-ui-border-width: 1px; --pagefind-ui-border-radius: 2px; --pagefind-ui-font: var(--song); }
+
+/* ── 窄屏：书脊横排，眉批折回条目下方 ── */
+@media (max-width: 60rem) {
+  .today { grid-template-columns: 1fr; gap: 1.5rem; }
+  .today-fig { max-width: 18rem; }
+  .catalog li { grid-template-columns: 6.5em minmax(0, 1fr); }
+  .catalog .who, .catalog .occ { grid-column: 2; border-left: 0; padding-top: .1em; font-size: .9rem; }
+  .catalog .who { white-space: normal; }
+  .leaf { grid-template-columns: 1fr; }
+  .spine { position: static; border-right: 0; border-bottom: 1px solid var(--rule); padding: 0 0 1.2rem; margin-bottom: 1.5rem;
+    flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: .4rem 1.2rem; min-height: 0; }
+  .spine-title, .spine-who, .spine-date, .spine-occ, .seal { writing-mode: horizontal-tb; text-orientation: mixed; }
+  .spine-title { font-size: 1.7rem; letter-spacing: .05em; }
+  .seal { margin-left: auto; padding: .1em .5em; }
+  .body li.noted { grid-template-columns: 1fr; }
+  .note { border-left: 0; padding-left: 0; margin-top: .15em; }
+  .note b { display: inline; margin-right: .6em; }
+  .note .src { display: inline; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .masthead nav a, a.more { transition: color .15s; }
+}

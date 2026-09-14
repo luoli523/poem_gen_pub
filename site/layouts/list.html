@@ -1,0 +1,7 @@
+{{ define "main" }}
+<main id="main" class="listing">
+  <h1>{{ .Title }}<small>{{ len .Pages }} 首</small></h1>
+  {{ .Content }}
+  {{ partial "poem-rows.html" .Pages.ByDate.Reverse }}
+</main>
+{{ end }}

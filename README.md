@@ -23,14 +23,15 @@
 
 ## 网站
 
-内容页积累在 `site/content/poems/`，由 Hugo（Hextra 主题）构建，每日流水线完成后自动发布到
-<https://luoli523.github.io/poem_gen_pub/>。可按作者 / 朝代 / 场景 / 素材分类 / 可信度浏览，支持全文搜索。
+内容页积累在 `site/content/poems/`（每首一个目录：`index.md` + `infographic.webp`），由 Hugo 构建，
+每日流水线完成后自动发布到 <https://luoli523.github.io/poem_gen_pub/>。
+版式取自宋版书（界行、竖排题名、眉批式的可信度与出处），主题在 `site/layouts` 与 `site/assets/css`，无外部主题依赖。
+可按作者 / 朝代 / 场景 / 素材分类 / 可信度浏览；全文搜索由 Pagefind 在构建后生成。
 
 本地预览：
 
 ```bash
-git submodule update --init
-hugo --source site server
+hugo --source site server            # 搜索页需先 hugo 构建后执行 npx pagefind --site site/public
 ```
 
 ## 快速开始

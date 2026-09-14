@@ -1,0 +1,10 @@
+{{ define "main" }}
+<main id="main" class="index">
+  <h1>{{ index site.Params.taxonomyTitles .Data.Plural | default .Title }}<small>{{ len .Data.Terms }} 项</small></h1>
+  <ul class="terms">
+  {{ range .Data.Terms.ByCount }}
+    <li><a href="{{ .Page.RelPermalink }}">{{ .Page.Title }}</a><span class="n">{{ .Count }}</span></li>
+  {{ end }}
+  </ul>
+</main>
+{{ end }}

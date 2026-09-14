@@ -1,0 +1,8 @@
+{{/* 把生成器写出的 Markdown 转成版式：去掉首行作者（已在书脊）、诗句加类、〔可信度 · 出处〕改为眉批 */}}
+{{ $c := .Content | string }}
+{{ $c = replaceRE `(?s)^\s*<p><strong>[^<]*</strong>[^<]*</p>` "" $c }}
+{{/* 诗句紧接信息图之后，楷体大字自足，不需要"诗词全文"这个标签 */}}
+{{ $c = replaceRE `(?s)<h2 id="诗词全文">.*?</h2>\s*<p>` `<p class="poem">` $c }}
+{{/* 条目文本限定为无标签（RE2 无 lookahead，.*? 会跨过 </li> 匹配到下一个列表）；含标签的条目退回普通 li */}}
+{{ $c = replaceRE `<li>([^<]*?)\s*〔([^·〕]+?)(?: · ([^〕]*))?〕\s*</li>` `<li class="noted"><span class="li-text">$1</span><aside class="note" data-kind="$2"><b>$2</b><span class="src">$3</span></aside></li>` $c }}
+{{ $c | safeHTML }}

@@ -1,0 +1,32 @@
+{{ define "main" }}
+{{ $poems := where site.RegularPages "Section" "poems" }}
+{{/* 同一天可能有多首（手动运行），首页优先展示有信息图的最新一首 */}}
+{{ $withImg := where (where $poems "Params.infographic" "!=" nil) "Params.infographic" "!=" "" }}
+{{ $today := index $withImg 0 | default (index $poems 0) }}
+<main id="main" class="home">
+{{ with $today }}
+  <article class="today">
+    {{ with .Resources.Get .Params.infographic }}
+    <a class="today-fig" href="{{ $.RelPermalink }}"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Title }} 信息图" decoding="async"></a>
+    {{ end }}
+    <div class="today-text">
+      {{ $m := strings.FindRESubmatch `(?s)<h2 id="诗词全文">.*?</h2>\s*<p>(.*?)</p>` (.Content | string) 1 }}
+      {{ with $m }}<p class="poem">{{ index (index . 0) 1 | safeHTML }}</p>{{ end }}
+      <h1 class="today-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h1>
+      <p class="today-meta">{{ .Params.dynasty }}·{{ .Params.author }}<span>{{ .Date.Format "2006年1月2日" }}</span>{{ with .Params.occasion }}<span>{{ . }}</span>{{ end }}</p>
+      {{ with .Params.summary }}<p class="today-summary">{{ . }}</p>{{ end }}
+      <a class="more" href="{{ .RelPermalink }}">读这首的背后</a>
+    </div>
+  </article>
+{{ else }}
+  <p class="empty">还没有内容。第一首会在明早 7:00 出现。</p>
+{{ end }}
+{{ with where $poems "Permalink" "!=" $today.Permalink }}
+  <section class="recent">
+    <h2>近日</h2>
+    {{ partial "poem-rows.html" (first 10 .) }}
+    <p class="all"><a href="{{ "/poems/" | relURL }}">全部 {{ len $poems }} 首</a></p>
+  </section>
+{{ end }}
+</main>
+{{ end }}

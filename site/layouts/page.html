@@ -1,0 +1,19 @@
+{{ define "main" }}
+<main id="main" class="leaf" data-pagefind-body>
+  <aside class="spine">
+    <h1 class="spine-title">{{ .Title }}</h1>
+    <p class="spine-who">{{ .Params.dynasty }}·{{ .Params.author }}</p>
+    <p class="spine-date"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006年1月2日" }}</time></p>
+    {{ with .Params.occasion }}<p class="spine-occ"><a href="{{ "/occasions/" | relURL }}{{ . | urlize }}/">{{ . }}</a></p>{{ end }}
+    <a class="seal" href="{{ "/authors/" | relURL }}{{ .Params.author | urlize }}/" aria-label="作者 {{ .Params.author }}" data-pagefind-meta="author">{{ .Params.author }}</a>
+  </aside>
+  <article class="body">
+    {{ partial "poem-body.html" . }}
+    {{ with .Params.categories }}
+    <nav class="tail" aria-label="本页素材分类">
+      {{ range . }}<a href="{{ "/categories/" | relURL }}{{ . | urlize }}/">{{ . }}</a>{{ end }}
+    </nav>
+    {{ end }}
+  </article>
+</main>
+{{ end }}

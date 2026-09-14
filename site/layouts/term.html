@@ -1,0 +1,8 @@
+{{ define "main" }}
+<main id="main" class="listing">
+  {{ $tax := .Data.Plural }}
+  <p class="crumb"><a href="{{ .Parent.RelPermalink }}">{{ index site.Params.taxonomyTitles $tax | default .Parent.Title }}</a></p>
+  <h1>{{ .Title }}<small>{{ len .Pages }} 首</small></h1>
+  {{ partial "poem-rows.html" .Pages.ByDate.Reverse }}
+</main>
+{{ end }}
