@@ -292,8 +292,8 @@ def _covered_points(story: dict | None) -> str:
 
 async def get_tale(poem: dict, story: dict | None, recent_pivot_types: list[str]) -> dict | None:
     """调用 LLM 生成一则衍生故事。失败返回 None，不影响主流程。"""
-    from src.common.config import get_llm_config
-    llm = get_llm_config()
+    from src.common.config import get_tale_llm_config
+    llm = get_tale_llm_config()
     if not llm["api_key"]:
         return None
 

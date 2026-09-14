@@ -58,6 +58,29 @@ def get_llm_config() -> dict:
     return config
 
 
+def get_tale_llm_config() -> dict:
+    """衍生一则专用 LLM 配置：在主配置上叠加 config.yaml 的 tale 段（model / api_key_env /
+    base_url / max_completion_tokens），用于换模型对比实验。未配置的项沿用主配置。"""
+    import os
+
+    config = get_llm_config()
+    tale_cfg = _load().get("tale", {}) or {}
+
+    if tale_cfg.get("model"):
+        config["model"] = tale_cfg["model"]
+    if tale_cfg.get("max_completion_tokens"):
+        config["max_completion_tokens"] = tale_cfg["max_completion_tokens"]
+    if tale_cfg.get("api_key_env"):
+        key = os.getenv(tale_cfg["api_key_env"], "").strip()
+        if key:
+            config["api_key"] = key
+            if tale_cfg.get("base_url"):
+                config["base_url"] = tale_cfg["base_url"]
+            else:
+                config.pop("base_url", None)
+    return config
+
+
 # 向后兼容别名
 get_openai_config = get_llm_config
 
