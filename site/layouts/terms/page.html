@@ -1,0 +1,27 @@
+{{ define "main" }}
+<main id="main" class="leaf" data-pagefind-body>
+  <aside class="spine">
+    <h1 class="spine-title">{{ .Params.jieling_name }}</h1>
+    <p class="spine-who">{{ .Params.year }}年</p>
+    {{ with .Params.lunar }}<p class="spine-date">{{ . }}</p>{{ end }}
+    <p class="spine-date"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "1月2日" }}</time></p>
+    {{ with site.GetPage (printf "/jieling/%s" .Params.jieling_name) }}<p class="spine-occ"><a href="{{ .RelPermalink }}">同日诗词</a></p>{{ end }}
+    {{ $sealText := .Params.ethnic | default .Params.category }}
+    {{ with site.GetPage (printf "/jieling_categories/%s" $sealText) }}<a class="seal" href="{{ .RelPermalink }}" aria-label="{{ $sealText }}" data-pagefind-meta="category">{{ $sealText }}</a>{{ end }}
+  </aside>
+  <article class="body">
+    {{ partial "poem-body.html" . }}
+    {{ $siblings := where (where site.RegularPages "Section" "terms") "Params.jieling_name" .Params.jieling_name }}
+    {{ if gt (len $siblings) 1 }}
+    <nav class="tail" aria-label="其他年份">
+      {{ range $siblings.ByDate.Reverse }}{{ if ne .Permalink $.Permalink }}<a href="{{ .RelPermalink }}">{{ .Params.year }}年</a>{{ end }}{{ end }}
+    </nav>
+    {{ end }}
+    {{ with .Params.categories }}
+    <nav class="tail" aria-label="本页素材分类">
+      {{ range . }}{{ with site.GetPage (printf "/categories/%s" .) }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }}{{ end }}
+    </nav>
+    {{ end }}
+  </article>
+</main>
+{{ end }}

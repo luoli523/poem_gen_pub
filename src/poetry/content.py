@@ -143,11 +143,13 @@ def generate_site_page(
     story: dict | None,
     tale: dict | None = None,
     infographic: str | None = None,
+    jieling: list[str] | None = None,
 ) -> str:
     """生成 Hugo 内容页：frontmatter（分类索引用）+ 信息图 + 诗 + 赏析 + 背后的故事 + 衍生一则。
 
     story / tale 为 None 时仍生成页面，缺的部分留待以后用 --poem 回补。
     infographic 为同目录内的图片文件名，None 表示尚未生成。
+    jieling 为当天的节令名（如 ["中秋"]），用于与节令档案页互链。
     """
     sections = (story or {}).get("sections", {})
     summary = (story or {}).get("summary", "")
@@ -169,6 +171,7 @@ def generate_site_page(
         "pivot_types": [tale["pivot_type"]] if tale else [],
         "tale_title": tale["title"] if tale else "",
         "infographic": infographic or "",
+        "jieling": list(jieling or []),
         "summary": summary,
     }
     front_text = yaml.safe_dump(front, allow_unicode=True, sort_keys=False).rstrip()

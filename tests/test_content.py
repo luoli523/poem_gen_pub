@@ -1,41 +1,11 @@
-"""Tests for content generation across solar_term and poetry modules."""
+"""Tests for poetry content generation."""
 
 import pytest
-from src.solar_term.content import (
-    generate_markdown as solar_term_markdown,
-    build_telegram_caption as solar_term_tg,
-    build_ig_caption as solar_term_ig,
-)
 from src.poetry.content import (
     generate_markdown as poetry_markdown,
     build_telegram_caption as poetry_tg,
     build_ig_caption as poetry_ig,
 )
-
-
-class TestSolarTermContent:
-
-    def test_markdown_structure(self, sample_solar_term):
-        md = solar_term_markdown(sample_solar_term)
-        assert "# 雨水" in md
-        assert "春" in md
-        assert "节气介绍" in md
-        assert "传统习俗" in md
-        assert "养生提示" in md
-
-    def test_telegram_caption(self, sample_solar_term):
-        caption = solar_term_tg(sample_solar_term)
-        assert "雨水" in caption
-        assert "<b>" in caption  # HTML format
-
-    def test_ig_caption(self, sample_solar_term):
-        caption = solar_term_ig(sample_solar_term)
-        assert "雨水" in caption
-        assert "#二十四节气" in caption
-
-    def test_customs_in_markdown(self, sample_solar_term):
-        md = solar_term_markdown(sample_solar_term)
-        assert "接寿" in md
 
 
 class TestPoetryContent:

@@ -97,6 +97,9 @@ def _normalize_item(item) -> dict | None:
     return {"text": text.strip(), "kind": kind, "source": source}
 
 
+normalize_item = _normalize_item   # 节令模块复用同一套 kind / source 归一化规则
+
+
 def _validate_and_normalize(data: dict) -> dict | None:
     """校验 LLM 返回的故事数据。六类全空且无 summary 时视为无效，返回 None。"""
     summary = data.get("summary")

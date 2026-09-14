@@ -160,3 +160,11 @@ dialog.zoom p { position: fixed; bottom: .8rem; left: 0; right: 0; text-align: c
 @media (prefers-reduced-motion: no-preference) {
   .masthead nav a, a.more { transition: color .15s; }
 }
+
+/* ── 节令目录：缩略图 ｜ 类别 ｜ 名 ｜ 年份 ｜ 农历/季 ── */
+.catalog.terms li { grid-template-columns: 3rem 6.5em minmax(0, 1fr) 12em 9em; }
+.catalog .years a { margin-right: .8em; font-variant-numeric: tabular-nums; }
+@media (max-width: 60rem) {
+  .catalog.terms li { grid-template-columns: 3rem 6.5em minmax(0, 1fr); }
+  .catalog.terms .years, .catalog.terms .occ { grid-column: 3; border-left: 0; padding-top: .1em; font-size: .9rem; }
+}

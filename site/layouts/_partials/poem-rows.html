@@ -12,8 +12,8 @@
     {{ end }}
     <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "1月2日" }}<small>{{ .Date.Format "2006" }}</small></time>
     <a class="t" href="{{ .RelPermalink }}">{{ .Title }}</a>
-    <span class="who">{{ .Params.dynasty }}·{{ .Params.author }}</span>
-    <span class="occ">{{ .Params.occasion }}</span>
+    <span class="who">{{ with .Params.author }}{{ $p.Params.dynasty }}·{{ . }}{{ else }}{{ .Params.ethnic | default .Params.category }}{{ end }}</span>
+    <span class="occ">{{ .Params.occasion | default (.Params.lunar | default .Params.season) }}</span>
   </li>
 {{ end }}
 </ol>

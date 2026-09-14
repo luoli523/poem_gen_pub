@@ -1,0 +1,22 @@
+{{ define "main" }}
+<main id="main" class="listing terms-list">
+  <h1>{{ .Title }}<small>{{ len .Pages }} 页</small></h1>
+  {{ .Content }}
+  {{/* 按节令名分组：每个节令一行，年份逐页累积 */}}
+  <ol class="catalog terms">
+  {{ range .Pages.GroupByParam "jieling_name" }}
+    {{ $first := index .Pages.ByDate.Reverse 0 }}
+    <li>
+      {{ $img := "" }}{{ with $first.Params.infographic }}{{ $img = $first.Resources.Get . }}{{ end }}
+      {{ with $img }}{{ $t := .Resize "144x webp q80" }}
+      <a class="zoom-link thumb" href="{{ .RelPermalink }}" data-alt="{{ $first.Title }} 信息图" title="放大信息图"><img src="{{ $t.RelPermalink }}" width="{{ $t.Width }}" height="{{ $t.Height }}" alt="" loading="lazy" decoding="async"></a>
+      {{ else }}<span class="thumb empty" aria-hidden="true"></span>{{ end }}
+      <span class="who">{{ $first.Params.ethnic | default $first.Params.category }}</span>
+      <a class="t" href="{{ $first.RelPermalink }}">{{ .Key }}</a>
+      <span class="years">{{ range .Pages.ByDate.Reverse }}<a href="{{ .RelPermalink }}">{{ .Params.year }}</a>{{ end }}</span>
+      <span class="occ">{{ $first.Params.lunar | default $first.Params.season }}</span>
+    </li>
+  {{ end }}
+  </ol>
+</main>
+{{ end }}

@@ -24,21 +24,6 @@ def _isolate_env(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def sample_solar_term():
-    return {
-        "name": "雨水",
-        "date": "2026-02-18",
-        "season": "春",
-        "meaning": "雨水是二十四节气之第二个节气，意味着降雨开始",
-        "description": "雨水节气标志着气温回升、冰雪融化、降水增多。",
-        "customs": ["接寿", "回娘屋", "拉保保", "撞拜寄"],
-        "food": "春笋、荠菜、韭菜等时令蔬菜",
-        "health_tip": "春季养生以养肝为主，宜清淡饮食",
-        "infographic_prompt": "中国风水墨画信息图...",
-    }
-
-
-@pytest.fixture
 def sample_poem():
     return {
         "has_poem": True,

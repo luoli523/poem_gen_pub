@@ -20,15 +20,20 @@ taxonomies:
   category: categories
   kind: kinds
   pivot_type: pivot_types
+  jieling: jieling                     # 节令名：节令档案页与当天诗词页共用，互链
+  jieling_category: jieling_categories # 节气 / 汉族节日 / 民族节日 / 具体民族
 
 menu:
   main:
     - name: 诗词
       pageRef: /poems
       weight: 1
+    - name: 节令
+      pageRef: /terms
+      weight: 2
     - name: 作者
       pageRef: /authors
-      weight: 2
+      weight: 3
     - name: 朝代
       pageRef: /dynasties
       weight: 3
@@ -54,3 +59,5 @@ params:
     categories: 素材分类
     kinds: 可信度
     pivot_types: 衍生类型
+    jieling: 节令
+    jieling_categories: 节令类别

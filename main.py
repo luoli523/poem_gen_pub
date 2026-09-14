@@ -19,12 +19,10 @@ from src.common.instagram import get_ig_config, publish_album as ig_publish_albu
 from src.common.notebooklm import check_auth as check_nlm_auth, run_pipeline as nlm_run_pipeline
 from src.common.constants import beijing_today
 
-# ── 节气模块 ──
-from src.solar_term.detector import get_solar_term
-from src.solar_term.content import (
-    generate_markdown as solar_term_generate_markdown,
-    build_ig_caption as solar_term_build_ig_caption,
-)
+# ── 节令模块（节气 + 汉族节日 + 少数民族节日）──
+from src.jieling.calendar import get_jieling
+from src.jieling.story import get_jieling_story
+from src.jieling import content as jieling_content
 
 # ── 诗词模块 ──
 from src.poetry.detector import get_poem, get_poem_by_name, record_pivot_type, recent_pivot_types
@@ -49,6 +47,8 @@ def parse_args() -> argparse.Namespace:
     poem_group.add_argument("--poem", type=str, default=None,
                             help="指定诗词名称或关键词（如 '静夜思'、'水调歌头'）")
 
+    parser.add_argument("--date", type=str, default=None,
+                        help="指定日期 YYYY-MM-DD（默认北京时间今天）；用于测试或回补某个节令日")
     parser.add_argument("--ratio", type=str, default="4:5",
                         choices=["4:5", "9:16", "1:1", "16:9"],
                         help="信息图长宽比例（默认 4:5）")
@@ -199,13 +199,14 @@ async def _build_poem_story(poem: dict, tale_enabled: bool) -> tuple[dict | None
 
 def _write_poem_page(
     poem: dict, site_dir: Path, story: dict | None, tale: dict | None,
-    infographic: str | None = None,
+    infographic: str | None = None, jieling: list[str] | None = None,
 ) -> Path:
     """写 Hugo leaf bundle：<site_dir>/<日期-诗题>/index.md。"""
     page_file = site_dir / poetry_site_page_dir(poem) / "index.md"
     page_file.parent.mkdir(parents=True, exist_ok=True)
     page_file.write_text(
-        poetry_generate_site_page(poem, story, tale, infographic=infographic), encoding="utf-8",
+        poetry_generate_site_page(poem, story, tale, infographic=infographic, jieling=jieling),
+        encoding="utf-8",
     )
     print(f"  📄 站点内容页: {page_file}")
     return page_file
@@ -214,7 +215,7 @@ def _write_poem_page(
 async def _run_poem_flow(
     poem: dict, name_key: str, today: str, output_dir: Path, site_dir: Path,
     skip_notebooklm: bool, skip_ig: bool, tale_enabled: bool, ratio: str,
-    problems: list[str],
+    problems: list[str], jieling: list[str] | None = None,
 ) -> None:
     """诗词完整流程：故事 → 先落一版无图页面 → 信息图/推送 → 图转 WebP 存入页面目录并重写页面。
 
@@ -224,7 +225,7 @@ async def _run_poem_flow(
     story, tale = await _build_poem_story(poem, tale_enabled)
     if story is None:
         problems.append(f"《{poem['title']}》背后的故事生成失败，页面已落地但无故事（可用 --poem 回补）")
-    _write_poem_page(poem, site_dir, story, tale)
+    _write_poem_page(poem, site_dir, story, tale, jieling=jieling)
 
     image = await _run_content_pipeline(
         label="诗词",
@@ -242,7 +243,7 @@ async def _run_poem_flow(
     if image:
         webp = save_infographic_webp(image, site_dir / poetry_site_page_dir(poem) / INFOGRAPHIC_FILENAME)
         print(f"  🖼 信息图已存入站点: {webp}")
-        _write_poem_page(poem, site_dir, story, tale, infographic=INFOGRAPHIC_FILENAME)
+        _write_poem_page(poem, site_dir, story, tale, infographic=INFOGRAPHIC_FILENAME, jieling=jieling)
     elif not skip_notebooklm:
         problems.append(f"《{poem['title']}》信息图未生成（NotebookLM 失败），页面无图")
 
@@ -269,6 +270,55 @@ async def _report_problems(today: str, problems: list[str]) -> None:
     print("📱 已通过 Telegram 发送降级汇总")
 
 
+# ── 节令：素材 + 档案页 + 信息图 ──
+
+
+async def _run_jieling_flow(
+    item: dict, today: str, output_dir: Path, terms_dir: Path,
+    skip_notebooklm: bool, skip_ig: bool, ratio: str, problems: list[str],
+) -> None:
+    """一个节令的完整流程：读往年 → 生成素材 → 先落页面 + story.json → 信息图/推送 → 补图。
+
+    每个节令按年积累（terms/<名>/<年>/），往年要点喂给 LLM 作排除。
+    """
+    label = f"节令·{item['name']}"
+    previous = jieling_content.load_previous_stories(terms_dir, item)
+    if previous:
+        print(f"  📚 往年已有 {len(previous)} 页，生成时排除已写要点")
+
+    print(f"\n🌿 正在生成「{item['name']}」素材...")
+    story = await get_jieling_story(item, previous)
+    page_dir = jieling_content.page_dir(terms_dir, item)
+    page_dir.mkdir(parents=True, exist_ok=True)
+    if story is None:
+        problems.append(f"节令「{item['name']}」素材生成失败，页面已落地但无内容（可用 --date 回补）")
+        (page_dir / "index.md").write_text(jieling_content.generate_site_page(item, None), encoding="utf-8")
+        return
+    n = sum(len(v) for v in story["sections"].values())
+    print(f"  ✅ 素材生成完成：{n} 条")
+    jieling_content.save_story_json(page_dir, story)
+    (page_dir / "index.md").write_text(jieling_content.generate_site_page(item, story), encoding="utf-8")
+    print(f"  📄 节令档案页: {page_dir / 'index.md'}")
+
+    data = {**item, "infographic_prompt": story["infographic_prompt"]}
+    image = await _run_content_pipeline(
+        label=label, data=data, today=today, output_dir=output_dir,
+        skip_notebooklm=skip_notebooklm, skip_ig=skip_ig,
+        generate_markdown_fn=lambda _d: jieling_content.generate_nlm_markdown(item, story),
+        build_caption_fn=lambda _d: jieling_content.build_ig_caption(item, story),
+        md_filename=f"jieling_{item['name']}_{today}.md",
+        artifact_name=f"节令_{item['name']}_{today}",
+        ratio=ratio,
+    )
+    if image:
+        webp = save_infographic_webp(image, page_dir / INFOGRAPHIC_FILENAME)
+        print(f"  🖼 信息图已存入站点: {webp}")
+        (page_dir / "index.md").write_text(
+            jieling_content.generate_site_page(item, story, infographic=INFOGRAPHIC_FILENAME), encoding="utf-8")
+    elif not skip_notebooklm:
+        problems.append(f"节令「{item['name']}」信息图未生成（NotebookLM 失败），页面无图")
+
+
 # ── 主流程 ──
 
 
@@ -279,7 +329,7 @@ async def main():
     print("=== 古诗词与节气内容生成系统 ===\n")
 
     load_dotenv()
-    today = beijing_today()
+    today = args.date or beijing_today()
 
     from src.common.config import get_llm_config, get_llm_model
     llm_config = get_llm_config()
@@ -304,6 +354,7 @@ async def main():
     output_dir = Path(config["output"]["dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     site_dir = Path(config["site"]["content_dir"])
+    terms_dir = Path(config["site"]["terms_dir"])
     tale_enabled = bool(config.get("tale", {}).get("enabled", False))
 
     # 降级项：任一环节失败都记在这里，结尾统一汇报并把 run 标红
@@ -318,30 +369,24 @@ async def main():
             skip_notebooklm = True
             problems.append(f"NotebookLM 认证失效，今日所有信息图跳过。{NLM_AUTH_HINT}")
 
-    # ── 1. 节气检测与内容生成 ──
-    solar_term = await get_solar_term(today)
-    if solar_term:
-        print(f"\n🌿 今日节气：{solar_term['name']}！启动节气内容生成流程...")
-        image = await _run_content_pipeline(
-            label="节气",
-            data=solar_term,
-            today=today,
-            output_dir=output_dir,
-            skip_notebooklm=skip_notebooklm,
-            skip_ig=args.no_ig,
-            generate_markdown_fn=solar_term_generate_markdown,
-            build_caption_fn=solar_term_build_ig_caption,
-            md_filename=f"solar_term_{solar_term['name']}_{today}.md",
-            artifact_name=f"{solar_term['name']}_{today}",
-            ratio=args.ratio,
-        )
-        if image is None and not skip_notebooklm:
-            problems.append(f"节气「{solar_term['name']}」信息图未生成（NotebookLM 失败）")
+    # ── 1. 节令（节气 / 汉族节日 / 少数民族节日，可能同日多个）──
+    jieling_items = get_jieling(today)
+    jieling_names = [j["name"] for j in jieling_items]
+    if jieling_items:
+        print(f"\n🌿 今日节令：{'、'.join(jieling_names)}")
+        for i, item in enumerate(jieling_items):
+            if i and not skip_notebooklm:
+                print("\n⏳ 等待 30s（避免 NotebookLM 限流）...")
+                await asyncio.sleep(30)
+            await _run_jieling_flow(
+                item, today=today, output_dir=output_dir, terms_dir=terms_dir,
+                skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, ratio=args.ratio, problems=problems,
+            )
     else:
-        print(f"\n🌿 今日非节气日，跳过节气内容生成")
+        print(f"\n🌿 今日无节令")
 
     # ── 2. 诗词检测（LLM 动态匹配）与内容生成 ──
-    if solar_term and not skip_notebooklm:
+    if jieling_items and not skip_notebooklm:
         print("\n⏳ 等待 30s 后继续（避免 NotebookLM 限流）...")
         await asyncio.sleep(30)
 
@@ -355,7 +400,7 @@ async def main():
             await _run_poem_flow(
                 poem, name_key=poem["title"], today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
-                ratio=args.ratio, problems=problems,
+                ratio=args.ratio, problems=problems, jieling=jieling_names,
             )
         else:
             print(f"📜 诗词「{args.poem}」获取失败，跳过")
@@ -369,7 +414,7 @@ async def main():
             await _run_poem_flow(
                 poem, name_key=occasion, today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
-                ratio=args.ratio, problems=problems,
+                ratio=args.ratio, problems=problems, jieling=jieling_names,
             )
         else:
             print(f"📜 诗词获取失败，跳过")

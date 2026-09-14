@@ -13,6 +13,7 @@ output:
 # 站点内容（Hugo 内容页，每日诗词 + 背后的故事，提交回 repo 持续积累）
 site:
   content_dir: "./site/content/poems"
+  terms_dir: "./site/content/terms"      # 节令档案：terms/<节令名>/<年>/
 
 # 衍生一则（从诗中任一点跳出去的叙事故事）
 # 材料来源问题未解决前默认关闭；可单独指定模型做对比实验

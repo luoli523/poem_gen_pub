@@ -93,3 +93,51 @@ class TestReportProblems:
         with patch.object(main, "telegram_send_message", send):
             await main._report_problems("2026-09-15", ["甲"])
         send.assert_not_called()
+
+
+class TestJielingFlow:
+
+    @pytest.fixture
+    def item(self):
+        return {"name": "白露", "category": "节气", "ethnic": "", "date": "2026-09-07", "season": "秋", "lunar": ""}
+
+    @pytest.fixture
+    def story(self):
+        return {"summary": "s", "infographic_prompt": "p",
+                "sections": {"origin": [{"text": "t", "kind": "史实", "source": "《x》"}], "customs": [],
+                             "food_objects": [], "in_poetry": [], "figures_legends": [], "gazetteers": []}}
+
+    async def _run(self, tmp_path, item, story, image, skip_nlm=False):
+        problems: list[str] = []
+        with patch.object(main, "get_jieling_story", AsyncMock(return_value=story)) as gs, \
+             patch.object(main, "_run_content_pipeline", AsyncMock(return_value=image)), \
+             patch.object(main, "save_infographic_webp", lambda src, dst: dst):
+            await main._run_jieling_flow(item, today=item["date"], output_dir=tmp_path / "out",
+                                         terms_dir=tmp_path / "terms", skip_notebooklm=skip_nlm,
+                                         skip_ig=True, ratio="4:5", problems=problems)
+        return problems, gs
+
+    @pytest.mark.asyncio
+    async def test_page_json_and_image(self, tmp_path, item, story):
+        problems, _ = await self._run(tmp_path, item, story, "img.png")
+        d = tmp_path / "terms" / "白露" / "2026"
+        assert problems == [] and (d / "story.json").exists()
+        assert "infographic: infographic.webp" in (d / "index.md").read_text(encoding="utf-8")
+
+    @pytest.mark.asyncio
+    async def test_story_failure_writes_stub(self, tmp_path, item):
+        problems, _ = await self._run(tmp_path, item, None, None)
+        d = tmp_path / "terms" / "白露" / "2026"
+        assert "素材生成失败" in problems[0] and (d / "index.md").exists() and not (d / "story.json").exists()
+
+    @pytest.mark.asyncio
+    async def test_previous_year_fed_to_llm(self, tmp_path, item, story):
+        from src.jieling.content import save_story_json
+        save_story_json(tmp_path / "terms" / "白露" / "2025", story)
+        _, gs = await self._run(tmp_path, item, story, None, skip_nlm=True)
+        assert [p["year"] for p in gs.call_args.args[1]] == ["2025"]
+
+    @pytest.mark.asyncio
+    async def test_image_failure_recorded(self, tmp_path, item, story):
+        problems, _ = await self._run(tmp_path, item, story, None)
+        assert len(problems) == 1 and "信息图未生成" in problems[0]

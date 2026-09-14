@@ -11,6 +11,14 @@ on:
         description: "只生成内容并提交，不跑 NotebookLM / Telegram / Instagram（调 prompt 用）"
         type: boolean
         default: false
+      date:
+        description: "指定日期 YYYY-MM-DD（留空 = 北京时间今天）；用于测试或回补节令日"
+        type: string
+        default: ""
+      only_jieling:
+        description: "只跑节令，不选诗（回补节令时用）"
+        type: boolean
+        default: false
 
 jobs:
   generate:
@@ -72,7 +80,11 @@ jobs:
           IG_ENABLED: ${{ secrets.IG_ENABLED }}
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
-        run: python main.py ${{ inputs.dry_run && '--no-nlm --no-ig' || '' }}
+        run: >
+          python main.py
+          ${{ inputs.dry_run && '--no-nlm --no-ig' || '' }}
+          ${{ inputs.date != '' && format('--date {0}', inputs.date) || '' }}
+          ${{ inputs.only_jieling && '--no-poetry' || '' }}
 
       - name: Commit generated content
         if: always()

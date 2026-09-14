@@ -64,52 +64,6 @@ def _mock_llm_response(content: dict):
     return mock_response
 
 
-class TestSolarTermDetector:
-
-    @pytest.mark.asyncio
-    async def test_non_solar_term_day(self):
-        """Non-solar-term days should return None."""
-        from src.solar_term.detector import get_solar_term
-        result = await get_solar_term("2026-02-10")
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_solar_term_with_llm(self, monkeypatch):
-        """When LLM returns valid data, it should be merged into result."""
-        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-
-        mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_SOLAR_TERM_RESPONSE))
-        mock_client_instance = MagicMock()
-        mock_client_instance.chat.completions.create = mock_create
-
-        with patch("openai.AsyncOpenAI", return_value=mock_client_instance):
-            from src.solar_term.detector import get_solar_term
-            result = await get_solar_term("2026-02-18")
-
-        if result is not None:
-            assert result["name"] == "雨水"
-            assert result["season"] == "春"
-            assert result["meaning"] == MOCK_SOLAR_TERM_RESPONSE["meaning"]
-            assert isinstance(result["customs"], list)
-
-    @pytest.mark.asyncio
-    async def test_solar_term_llm_failure_falls_back(self, monkeypatch):
-        """When LLM fails, fallback data should be used."""
-        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-
-        mock_create = AsyncMock(side_effect=Exception("API error"))
-        mock_client_instance = MagicMock()
-        mock_client_instance.chat.completions.create = mock_create
-
-        with patch("openai.AsyncOpenAI", return_value=mock_client_instance):
-            from src.solar_term.detector import get_solar_term
-            result = await get_solar_term("2026-02-18")
-
-        if result is not None:
-            assert result["name"] == "雨水"
-            assert "二十四节气" in result["meaning"]
-
-
 class TestPoetryDetector:
 
     @pytest.mark.asyncio

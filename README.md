@@ -141,9 +141,10 @@ base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 │   ├── poetry/                  # 诗词模块
 │   │   ├── detector.py          # LLM 诗词匹配
 │   │   └── content.py           # Markdown / IG 文案 / TG 文案
-│   └── solar_term/              # 节气模块
-│       ├── detector.py          # 节气检测 + LLM 内容生成
-│       └── content.py           # Markdown / IG 文案 / TG 文案
+│   └── jieling/                 # 节令模块（节气 + 汉族节日 + 少数民族节日）
+│       ├── calendar.py          # 节令日历：sxtwl 节气 + zhdate 农历定日 + 按年硬编码
+│       ├── story.py             # LLM 六类素材 + 信息图 prompt，往年要点排除
+│       └── content.py           # 档案页 / story.json / NotebookLM source / 文案
 ├── scripts/
 │   └── ig_login.py              # Instagram 登录辅助
 └── tests/                       # 测试
