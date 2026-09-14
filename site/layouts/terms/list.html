@@ -3,7 +3,7 @@
   <h1>{{ .Title }}<small>{{ len .Pages }} 页</small></h1>
   {{ .Content }}
   {{/* 按节令名分组：每个节令一行，年份逐页累积 */}}
-  <ol class="catalog terms">
+  <ol class="catalog terms-catalog">
   {{ range .Pages.GroupByParam "jieling_name" }}
     {{ $first := index .Pages.ByDate.Reverse 0 }}
     <li>
