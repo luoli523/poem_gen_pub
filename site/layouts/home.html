@@ -6,8 +6,9 @@
 <main id="main" class="home">
 {{ with $today }}
   <article class="today">
+    {{ $p := . }}{{/* 嵌套 with 里 $ 是首页，不是这首诗 */}}
     {{ with .Resources.Get .Params.infographic }}
-    <a class="today-fig" href="{{ $.RelPermalink }}"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Title }} 信息图" decoding="async"></a>
+    <a class="today-fig" href="{{ $p.RelPermalink }}"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $p.Title }} 信息图" decoding="async"></a>
     {{ end }}
     <div class="today-text">
       {{ $m := strings.FindRESubmatch `(?s)<h2 id="诗词全文">.*?</h2>\s*<p>(.*?)</p>` (.Content | string) 1 }}
