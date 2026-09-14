@@ -189,12 +189,14 @@ async def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # NotebookLM 认证检测
+    nlm_auth_failed = False
     if not skip_notebooklm:
         print("\n🔑 检测 NotebookLM 认证...")
         nlm_auth_ok = await check_nlm_auth()
         if not nlm_auth_ok:
             print("❌ NotebookLM 认证失效，跳过所有 infographic 生成")
             skip_notebooklm = True
+            nlm_auth_failed = True
             tg_config = get_telegram_config()
             if tg_config:
                 bot_token, chat_id = tg_config
@@ -205,7 +207,7 @@ async def main():
                     f"❌ 无法生成 infographic，已跳过\n"
                     f"💡 请执行 <code>notebooklm login</code> 重新登录，\n"
                     f"然后更新 GitHub Secret：\n"
-                    f"<code>base64 &lt; ~/.notebooklm/storage_state.json | gh secret set NOTEBOOKLM_STORAGE_STATE</code>",
+                    f"<code>base64 -i ~/.notebooklm/profiles/default/storage_state.json | gh secret set NOTEBOOKLM_STORAGE_STATE</code>",
                 )
                 print("📱 已通过 Telegram 发送认证失效通知")
 
@@ -280,6 +282,11 @@ async def main():
             print(f"📜 诗词获取失败，跳过")
 
     print("\n✅ 全部完成！")
+
+    if nlm_auth_failed:
+        print("\n❌ 本次运行因 NotebookLM 认证失效未生成 infographic，请重新登录并更新 "
+              "GitHub Secret NOTEBOOKLM_STORAGE_STATE")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
