@@ -131,7 +131,7 @@ MOCK_TALE_RESPONSE = {
     "pivot": "扬州盐商",
     "pivot_type": "地域",
     "title": "程氏义仓",
-    "tale": "乾隆年间，扬州盐商程某……" * 20,
+    "tale": "乾隆年间，扬州盐商程晋芳……" * 20,
     "connection": "杜牧诗中的扬州繁华，正建立在盐运之上。",
     "kind": "史实",
     "source": "《扬州画舫录·卷九》",
