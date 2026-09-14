@@ -33,9 +33,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.lock
 
-      - name: Run tests
-        run: python -m pytest tests/ -v --tb=short
-
       - name: Restore NotebookLM auth
         # 认证失败不中止 job：main.py 会跳过信息图、发 Telegram、结尾 exit 1 标红，
         # 但当天的诗与考据仍然生成并提交（页面先写、图后补）

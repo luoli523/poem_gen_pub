@@ -1,0 +1,23 @@
+name: 测试
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "site/content/**"        # bot 每日提交的内容不触发
+      - "data/poem_history.json"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements.lock
+      - run: pip install -r requirements.lock
+      - run: python -m pytest tests/ -v --tb=short
