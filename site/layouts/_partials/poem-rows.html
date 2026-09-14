@@ -2,6 +2,14 @@
 <ol class="catalog">
 {{ range . }}
   <li>
+    {{- $p := . }}{{/* range 内 $ 是传入 partial 的集合，不是当前页 */}}
+    {{- $full := "" }}{{ with $p.Params.infographic }}{{ $full = $p.Resources.Get . }}{{ end }}
+    {{ with $full }}
+    {{ $thumb := .Resize "144x webp q80" }}
+    <a class="zoom-link thumb" href="{{ .RelPermalink }}" data-alt="{{ $p.Title }} 信息图" title="放大信息图"><img src="{{ $thumb.RelPermalink }}" width="{{ $thumb.Width }}" height="{{ $thumb.Height }}" alt="" loading="lazy" decoding="async"></a>
+    {{ else }}
+    <span class="thumb empty" aria-hidden="true"></span>
+    {{ end }}
     <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "1月2日" }}<small>{{ .Date.Format "2006" }}</small></time>
     <a class="t" href="{{ .RelPermalink }}">{{ .Title }}</a>
     <span class="who">{{ .Params.dynasty }}·{{ .Params.author }}</span>

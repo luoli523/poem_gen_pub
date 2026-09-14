@@ -1,0 +1,14 @@
+<dialog class="zoom" id="zoom" aria-label="放大查看信息图"><img alt=""><p>点击任意处或按 Esc 关闭</p></dialog>
+<script>
+  (function () {
+    var dlg = document.getElementById('zoom'); if (!dlg || !dlg.showModal) return;
+    var img = dlg.querySelector('img');
+    document.querySelectorAll('a.zoom-link').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault(); img.src = a.href; img.alt = a.getAttribute('data-alt') || ''; dlg.showModal();
+      });
+    });
+    dlg.addEventListener('click', function () { dlg.close(); });
+    dlg.addEventListener('close', function () { img.removeAttribute('src'); });
+  })();
+</script>
