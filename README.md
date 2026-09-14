@@ -34,6 +34,8 @@
 hugo --source site server            # 搜索页需先 hugo 构建后执行 npx pagefind --site site/public
 ```
 
+每日流水线的完整流程、各环节失败后果与维护操作见 [docs/daily-run.md](docs/daily-run.md)。
+
 ## 快速开始
 
 ### 1. 安装依赖
