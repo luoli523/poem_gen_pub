@@ -91,14 +91,41 @@ class TestPoetrySitePage:
             },
         }
 
-    def test_filename_strips_unsafe_chars(self, sample_poem):
-        from src.poetry.content import site_page_filename
+    def test_dir_strips_unsafe_chars(self, sample_poem):
+        from src.poetry.content import site_page_dir
         poem = dict(sample_poem, title="水调歌头·明月几时有 / 试:题?")
-        assert site_page_filename(poem) == "2026-10-04-水调歌头·明月几时有试题.md"
+        assert site_page_dir(poem) == "2026-10-04-水调歌头·明月几时有试题"
 
-    def test_filename_empty_title(self, sample_poem):
-        from src.poetry.content import site_page_filename
-        assert site_page_filename(dict(sample_poem, title="???")) == "2026-10-04-untitled.md"
+    def test_dir_empty_title(self, sample_poem):
+        from src.poetry.content import site_page_dir
+        assert site_page_dir(dict(sample_poem, title="???")) == "2026-10-04-untitled"
+
+    def test_page_with_infographic(self, sample_poem, sample_story):
+        import yaml
+        from src.poetry.content import generate_site_page
+        page = generate_site_page(sample_poem, sample_story, infographic="infographic.webp")
+        _, front_text, body = page.split("---\n", 2)
+        assert yaml.safe_load(front_text)["infographic"] == "infographic.webp"
+        assert "![水调歌头·明月几时有 信息图](infographic.webp)" in body
+        assert body.index("信息图](") < body.index("## 诗词全文")   # 图在正文之前
+
+    def test_page_without_infographic(self, sample_poem, sample_story):
+        import yaml
+        from src.poetry.content import generate_site_page
+        page = generate_site_page(sample_poem, sample_story)
+        _, front_text, body = page.split("---\n", 2)
+        assert yaml.safe_load(front_text)["infographic"] == ""
+        assert "![" not in body
+
+    def test_save_infographic_webp(self, tmp_path):
+        from PIL import Image
+        from src.poetry.content import save_infographic_webp
+        src = tmp_path / "in.png"
+        Image.new("RGBA", (64, 96), (200, 30, 30, 255)).save(src)
+        dst = save_infographic_webp(str(src), tmp_path / "bundle" / "infographic.webp")
+        assert dst.exists()
+        with Image.open(dst) as im:
+            assert im.format == "WEBP" and im.size == (64, 96)
 
     def test_page_with_story(self, sample_poem, sample_story):
         import yaml

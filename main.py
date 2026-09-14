@@ -33,7 +33,9 @@ from src.poetry.content import (
     generate_markdown as poetry_generate_markdown,
     build_ig_caption as poetry_build_ig_caption,
     generate_site_page as poetry_generate_site_page,
-    site_page_filename as poetry_site_page_filename,
+    site_page_dir as poetry_site_page_dir,
+    save_infographic_webp,
+    INFOGRAPHIC_FILENAME,
 )
 
 
@@ -75,8 +77,12 @@ async def _run_content_pipeline(
     md_filename: str,
     artifact_name: str,
     ratio: str = "4:5",
-):
-    """通用内容管线：生成 Markdown → NotebookLM infographic → Telegram → Instagram"""
+) -> str | None:
+    """通用内容管线：生成 Markdown → NotebookLM infographic → Telegram → Instagram
+
+    Returns:
+        生成的信息图路径；未生成（跳过 / 失败）时返回 None
+    """
 
     # 1. 生成 Markdown
     md_content = generate_markdown_fn(data)
@@ -99,11 +105,11 @@ async def _run_content_pipeline(
 
     if skip_notebooklm:
         print("  ⏭ 跳过 NotebookLM（--no-nlm）")
-        return
+        return None
 
     # 2. NotebookLM 生成 infographic
     if not prompt:
-        return
+        return None
 
     image = await nlm_run_pipeline(
         label=label,
@@ -116,7 +122,7 @@ async def _run_content_pipeline(
 
     if not image:
         print(f"  ❌ {label} infographic 生成失败")
-        return
+        return None
 
     print(f"  🎨 {label}图片: {image}")
 
@@ -155,12 +161,14 @@ async def _run_content_pipeline(
         else:
             print(f"  ⏭ Instagram 未配置，跳过{label}发布")
 
+    return image
 
-# ── 诗词故事 + 站点内容页 ──
+
+# ── 诗词：故事 + 站点内容页 + 信息图 ──
 
 
-async def _write_poem_site_page(poem: dict, site_dir: Path, tale_enabled: bool) -> None:
-    """生成诗词背后的故事，写入 Hugo 内容页（故事失败时仍写入仅含诗词的页面）。"""
+async def _build_poem_story(poem: dict, tale_enabled: bool) -> tuple[dict | None, dict | None]:
+    """生成诗词背后的故事（与可选的衍生一则）。任一失败返回 None，不阻塞主流程。"""
     print("\n📖 正在生成诗词背后的故事...")
     story = await get_story(poem)
     if story:
@@ -181,10 +189,51 @@ async def _write_poem_site_page(poem: dict, site_dir: Path, tale_enabled: bool) 
     else:
         print("  ⏭ 衍生一则已关闭（config tale.enabled）")
 
-    page_file = site_dir / poetry_site_page_filename(poem)
+    return story, tale
+
+
+def _write_poem_page(
+    poem: dict, site_dir: Path, story: dict | None, tale: dict | None,
+    infographic: str | None = None,
+) -> Path:
+    """写 Hugo leaf bundle：<site_dir>/<日期-诗题>/index.md。"""
+    page_file = site_dir / poetry_site_page_dir(poem) / "index.md"
     page_file.parent.mkdir(parents=True, exist_ok=True)
-    page_file.write_text(poetry_generate_site_page(poem, story, tale), encoding="utf-8")
+    page_file.write_text(
+        poetry_generate_site_page(poem, story, tale, infographic=infographic), encoding="utf-8",
+    )
     print(f"  📄 站点内容页: {page_file}")
+    return page_file
+
+
+async def _run_poem_flow(
+    poem: dict, name_key: str, today: str, output_dir: Path, site_dir: Path,
+    skip_notebooklm: bool, skip_ig: bool, tale_enabled: bool, ratio: str,
+) -> None:
+    """诗词完整流程：故事 → 先落一版无图页面 → 信息图/推送 → 图转 WebP 存入页面目录并重写页面。
+
+    页面先写再补图，是为了 NotebookLM 失败或超时也不丢当天的文字内容。
+    """
+    story, tale = await _build_poem_story(poem, tale_enabled)
+    _write_poem_page(poem, site_dir, story, tale)
+
+    image = await _run_content_pipeline(
+        label="诗词",
+        data=poem,
+        today=today,
+        output_dir=output_dir,
+        skip_notebooklm=skip_notebooklm,
+        skip_ig=skip_ig,
+        generate_markdown_fn=poetry_generate_markdown,
+        build_caption_fn=poetry_build_ig_caption,
+        md_filename=f"poetry_{name_key}_{today}.md",
+        artifact_name=f"诗词_{name_key}_{today}",
+        ratio=ratio,
+    )
+    if image:
+        webp = save_infographic_webp(image, site_dir / poetry_site_page_dir(poem) / INFOGRAPHIC_FILENAME)
+        print(f"  🖼 信息图已存入站点: {webp}")
+        _write_poem_page(poem, site_dir, story, tale, infographic=INFOGRAPHIC_FILENAME)
 
 
 # ── 主流程 ──
@@ -279,19 +328,9 @@ async def main():
         poem = await get_poem_by_name(args.poem, today)
         if poem:
             print(f"📜 诗词：《{poem['title']}》（{poem['dynasty']}·{poem['author']}）")
-            occasion = poem.get("occasion", "自选诗词")
-            await _write_poem_site_page(poem, site_dir, tale_enabled)
-            await _run_content_pipeline(
-                label="诗词",
-                data=poem,
-                today=today,
-                output_dir=output_dir,
-                skip_notebooklm=skip_notebooklm,
-                skip_ig=args.no_ig,
-                generate_markdown_fn=poetry_generate_markdown,
-                build_caption_fn=poetry_build_ig_caption,
-                md_filename=f"poetry_{poem['title']}_{today}.md",
-                artifact_name=f"诗词_{poem['title']}_{today}",
+            await _run_poem_flow(
+                poem, name_key=poem["title"], today=today, output_dir=output_dir, site_dir=site_dir,
+                skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
                 ratio=args.ratio,
             )
         else:
@@ -302,18 +341,9 @@ async def main():
         if poem:
             occasion = poem.get("occasion", "诗词")
             print(f"📜 今日诗词：《{poem['title']}》（{poem['dynasty']}·{poem['author']}）— {occasion}")
-            await _write_poem_site_page(poem, site_dir, tale_enabled)
-            await _run_content_pipeline(
-                label="诗词",
-                data=poem,
-                today=today,
-                output_dir=output_dir,
-                skip_notebooklm=skip_notebooklm,
-                skip_ig=args.no_ig,
-                generate_markdown_fn=poetry_generate_markdown,
-                build_caption_fn=poetry_build_ig_caption,
-                md_filename=f"poetry_{occasion}_{today}.md",
-                artifact_name=f"诗词_{occasion}_{today}",
+            await _run_poem_flow(
+                poem, name_key=occasion, today=today, output_dir=output_dir, site_dir=site_dir,
+                skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
                 ratio=args.ratio,
             )
         else:

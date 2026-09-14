@@ -116,16 +116,38 @@ def build_telegram_caption(poem: dict) -> str:
 _UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\s]+')
 
 
-def site_page_filename(poem: dict) -> str:
-    """站点内容页文件名：YYYY-MM-DD-诗题.md，去掉文件名非法字符与空白。"""
+INFOGRAPHIC_FILENAME = "infographic.webp"
+_INFOGRAPHIC_WEBP_QUALITY = 85
+
+
+def site_page_dir(poem: dict) -> str:
+    """站点内容页目录名（Hugo leaf bundle）：YYYY-MM-DD-诗题，去掉非法字符与空白。
+    页面写为 <dir>/index.md，信息图与之同目录。"""
     title = _UNSAFE_FILENAME_CHARS.sub("", poem.get("title", "")) or "untitled"
-    return f"{poem.get('date', '')}-{title}.md"
+    return f"{poem.get('date', '')}-{title}"
 
 
-def generate_site_page(poem: dict, story: dict | None, tale: dict | None = None) -> str:
-    """生成 Hugo 内容页：frontmatter（分类索引用）+ 诗 + 赏析 + 背后的故事 + 衍生一则。
+def save_infographic_webp(src_image: str, dst_path: Path) -> Path:
+    """把 NotebookLM 下载的 PNG 转成 WebP 存入页面目录（原尺寸，q85 约 350KB，
+    直接存 PNG 每张 5MB 会让 repo 一年长 2GB）。"""
+    from PIL import Image
+
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(src_image) as im:
+        im.convert("RGB").save(dst_path, "WEBP", quality=_INFOGRAPHIC_WEBP_QUALITY, method=6)
+    return dst_path
+
+
+def generate_site_page(
+    poem: dict,
+    story: dict | None,
+    tale: dict | None = None,
+    infographic: str | None = None,
+) -> str:
+    """生成 Hugo 内容页：frontmatter（分类索引用）+ 信息图 + 诗 + 赏析 + 背后的故事 + 衍生一则。
 
     story / tale 为 None 时仍生成页面，缺的部分留待以后用 --poem 回补。
+    infographic 为同目录内的图片文件名，None 表示尚未生成。
     """
     sections = (story or {}).get("sections", {})
     summary = (story or {}).get("summary", "")
@@ -146,6 +168,7 @@ def generate_site_page(poem: dict, story: dict | None, tale: dict | None = None)
         "kinds": present_kinds,
         "pivot_types": [tale["pivot_type"]] if tale else [],
         "tale_title": tale["title"] if tale else "",
+        "infographic": infographic or "",
         "summary": summary,
     }
     front_text = yaml.safe_dump(front, allow_unicode=True, sort_keys=False).rstrip()
@@ -157,6 +180,10 @@ def generate_site_page(poem: dict, story: dict | None, tale: dict | None = None)
         "",
         f"**{poem['dynasty']}·{poem['author']}** · {poem.get('occasion', '')}",
         "",
+    ]
+    if infographic:
+        body += [f"![{poem['title']} 信息图]({infographic})", ""]
+    body += [
         "## 诗词全文",
         "",
         poem["full_text"],
