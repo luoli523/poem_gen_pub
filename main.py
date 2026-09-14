@@ -111,14 +111,19 @@ async def _run_content_pipeline(
     if not prompt:
         return None
 
-    image = await nlm_run_pipeline(
-        label=label,
-        md_file=str(md_file),
-        prompt=prompt,
-        artifact_name=artifact_name,
-        output_dir=str(output_dir),
-        ratio=ratio,
-    )
+    try:
+        image = await nlm_run_pipeline(
+            label=label,
+            md_file=str(md_file),
+            prompt=prompt,
+            artifact_name=artifact_name,
+            output_dir=str(output_dir),
+            ratio=ratio,
+        )
+    except Exception as e:
+        # 网络 / 配额 / 等待超时都在这里收住：当天文字内容已落地，只丢图
+        print(f"  ❌ {label} infographic 生成出错: {type(e).__name__}: {e}")
+        return None
 
     if not image:
         print(f"  ❌ {label} infographic 生成失败")
@@ -209,12 +214,16 @@ def _write_poem_page(
 async def _run_poem_flow(
     poem: dict, name_key: str, today: str, output_dir: Path, site_dir: Path,
     skip_notebooklm: bool, skip_ig: bool, tale_enabled: bool, ratio: str,
+    problems: list[str],
 ) -> None:
     """诗词完整流程：故事 → 先落一版无图页面 → 信息图/推送 → 图转 WebP 存入页面目录并重写页面。
 
     页面先写再补图，是为了 NotebookLM 失败或超时也不丢当天的文字内容。
+    降级情况追加到 problems，由 main 统一汇报。
     """
     story, tale = await _build_poem_story(poem, tale_enabled)
+    if story is None:
+        problems.append(f"《{poem['title']}》背后的故事生成失败，页面已落地但无故事（可用 --poem 回补）")
     _write_poem_page(poem, site_dir, story, tale)
 
     image = await _run_content_pipeline(
@@ -234,6 +243,30 @@ async def _run_poem_flow(
         webp = save_infographic_webp(image, site_dir / poetry_site_page_dir(poem) / INFOGRAPHIC_FILENAME)
         print(f"  🖼 信息图已存入站点: {webp}")
         _write_poem_page(poem, site_dir, story, tale, infographic=INFOGRAPHIC_FILENAME)
+    elif not skip_notebooklm:
+        problems.append(f"《{poem['title']}》信息图未生成（NotebookLM 失败），页面无图")
+
+
+NLM_AUTH_HINT = (
+    "检查 secret NOTEBOOKLM_MASTER_TOKEN；若 master token 已被吊销，本地重新执行 "
+    "notebooklm login --master-token --account <邮箱>，然后 "
+    "base64 -i ~/.notebooklm/profiles/default/master_token.json | gh secret set NOTEBOOKLM_MASTER_TOKEN"
+)
+
+
+async def _report_problems(today: str, problems: list[str]) -> None:
+    """把当天所有降级项汇总成一条 Telegram 消息并打印；由 main 决定退出码。"""
+    lines = "\n".join(f"• {p}" for p in problems)
+    print(f"\n⚠ 本次运行有 {len(problems)} 项降级：\n{lines}")
+    tg_config = get_telegram_config()
+    if not tg_config:
+        return
+    bot_token, chat_id = tg_config
+    await telegram_send_message(
+        bot_token, chat_id,
+        f"⚠️ <b>今日流水线降级</b>\n\n📅 {today}\n\n{lines}",
+    )
+    print("📱 已通过 Telegram 发送降级汇总")
 
 
 # ── 主流程 ──
@@ -248,7 +281,7 @@ async def main():
     load_dotenv()
     today = beijing_today()
 
-    from src.common.config import get_llm_config
+    from src.common.config import get_llm_config, get_llm_model
     llm_config = get_llm_config()
     if not llm_config["api_key"]:
         print("⚠ LLM API Key 未配置（GROK_API_KEY 或 OPENAI_API_KEY），跳过当日全部生成流程")
@@ -265,7 +298,7 @@ async def main():
             print("📱 已通过 Telegram 发送未执行通知")
         else:
             print("⚠ Telegram 也未配置，无法发送通知")
-        return
+        sys.exit(1)
 
     config = load_config()
     output_dir = Path(config["output"]["dir"])
@@ -273,34 +306,23 @@ async def main():
     site_dir = Path(config["site"]["content_dir"])
     tale_enabled = bool(config.get("tale", {}).get("enabled", False))
 
+    # 降级项：任一环节失败都记在这里，结尾统一汇报并把 run 标红
+    problems: list[str] = []
+
     # NotebookLM 认证检测
-    nlm_auth_failed = False
     if not skip_notebooklm:
         print("\n🔑 检测 NotebookLM 认证...")
         nlm_auth_ok = await check_nlm_auth()
         if not nlm_auth_ok:
             print("❌ NotebookLM 认证失效，跳过所有 infographic 生成")
             skip_notebooklm = True
-            nlm_auth_failed = True
-            tg_config = get_telegram_config()
-            if tg_config:
-                bot_token, chat_id = tg_config
-                await telegram_send_message(
-                    bot_token, chat_id,
-                    f"⚠️ <b>NotebookLM 认证失效</b>\n\n"
-                    f"📅 日期：{today}\n"
-                    f"❌ 无法生成 infographic，已跳过\n"
-                    f"💡 请执行 <code>notebooklm login</code> 重新登录，\n"
-                    f"然后更新 GitHub Secret：\n"
-                    f"<code>base64 -i ~/.notebooklm/profiles/default/storage_state.json | gh secret set NOTEBOOKLM_STORAGE_STATE</code>",
-                )
-                print("📱 已通过 Telegram 发送认证失效通知")
+            problems.append(f"NotebookLM 认证失效，今日所有信息图跳过。{NLM_AUTH_HINT}")
 
     # ── 1. 节气检测与内容生成 ──
     solar_term = await get_solar_term(today)
     if solar_term:
         print(f"\n🌿 今日节气：{solar_term['name']}！启动节气内容生成流程...")
-        await _run_content_pipeline(
+        image = await _run_content_pipeline(
             label="节气",
             data=solar_term,
             today=today,
@@ -313,6 +335,8 @@ async def main():
             artifact_name=f"{solar_term['name']}_{today}",
             ratio=args.ratio,
         )
+        if image is None and not skip_notebooklm:
+            problems.append(f"节气「{solar_term['name']}」信息图未生成（NotebookLM 失败）")
     else:
         print(f"\n🌿 今日非节气日，跳过节气内容生成")
 
@@ -331,10 +355,11 @@ async def main():
             await _run_poem_flow(
                 poem, name_key=poem["title"], today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
-                ratio=args.ratio,
+                ratio=args.ratio, problems=problems,
             )
         else:
             print(f"📜 诗词「{args.poem}」获取失败，跳过")
+            problems.append(f"指定诗词「{args.poem}」获取失败，今日无诗词内容")
     else:
         print(f"\n📜 正在调用 LLM 获取今日诗词...")
         poem = await get_poem(today)
@@ -344,17 +369,20 @@ async def main():
             await _run_poem_flow(
                 poem, name_key=occasion, today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
-                ratio=args.ratio,
+                ratio=args.ratio, problems=problems,
             )
         else:
             print(f"📜 诗词获取失败，跳过")
+            problems.append(
+                "今日诗词获取失败（LLM 无返回 / JSON 解析失败 / 模型不可用），今日无诗词内容。"
+                f"当前模型：{get_llm_model()}"
+            )
+
+    if problems:
+        await _report_problems(today, problems)
+        sys.exit(1)
 
     print("\n✅ 全部完成！")
-
-    if nlm_auth_failed:
-        print("\n❌ 本次运行因 NotebookLM 认证失效未生成 infographic，请重新登录并更新 "
-              "GitHub Secret NOTEBOOKLM_STORAGE_STATE")
-        sys.exit(1)
 
 
 if __name__ == "__main__":
