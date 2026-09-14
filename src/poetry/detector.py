@@ -25,7 +25,8 @@ def _load_history(days: int = _HISTORY_DAYS) -> list[dict]:
         return []
     try:
         records = json.loads(_HISTORY_PATH.read_text(encoding="utf-8"))
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        from src.common.constants import beijing_now
+        cutoff = (beijing_now() - timedelta(days=days)).strftime("%Y-%m-%d")
         return [r for r in records if r.get("date", "") >= cutoff]
     except Exception:
         return []

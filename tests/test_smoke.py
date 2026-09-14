@@ -57,3 +57,21 @@ class TestPipelineSmoke:
         assert "--no-nlm" in result.stdout
         assert "--no-ig" in result.stdout
         assert "--no-poetry" in result.stdout
+
+
+def test_beijing_today_uses_asia_shanghai(monkeypatch):
+    """runner 是 UTC；'今天'必须按北京时间算。构造 UTC 22:30（北京次日 06:30）验证跨日。"""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    import src.common.constants as c
+
+    fixed_utc = datetime(2026, 9, 14, 22, 30, tzinfo=timezone.utc)
+
+    class _FakeDT(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_utc.astimezone(tz) if tz else fixed_utc.replace(tzinfo=None)
+
+    monkeypatch.setattr(c, "datetime", _FakeDT)
+    assert c.beijing_today() == "2026-09-15"
+    assert c.beijing_now().tzinfo == ZoneInfo("Asia/Shanghai")

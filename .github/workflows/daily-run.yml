@@ -36,6 +36,9 @@ jobs:
         run: python -m pytest tests/ -v --tb=short
 
       - name: Restore NotebookLM auth
+        # 认证失败不中止 job：main.py 会跳过信息图、发 Telegram、结尾 exit 1 标红，
+        # 但当天的诗与考据仍然生成并提交（页面先写、图后补）
+        continue-on-error: true
         run: |
           if [ -z "$NOTEBOOKLM_MASTER_TOKEN" ]; then
             echo "::error::缺少 secret NOTEBOOKLM_MASTER_TOKEN，无法生成 infographic。" \

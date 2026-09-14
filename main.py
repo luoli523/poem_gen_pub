@@ -7,7 +7,6 @@
 import asyncio
 import argparse
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -18,6 +17,7 @@ from dotenv import load_dotenv
 from src.common.telegram import send_photo as telegram_send_photo, send_message as telegram_send_message, get_telegram_config
 from src.common.instagram import get_ig_config, publish_album as ig_publish_album
 from src.common.notebooklm import check_auth as check_nlm_auth, run_pipeline as nlm_run_pipeline
+from src.common.constants import beijing_today
 
 # ── 节气模块 ──
 from src.solar_term.detector import get_solar_term
@@ -246,7 +246,7 @@ async def main():
     print("=== 古诗词与节气内容生成系统 ===\n")
 
     load_dotenv()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = beijing_today()
 
     from src.common.config import get_llm_config
     llm_config = get_llm_config()
