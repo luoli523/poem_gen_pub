@@ -238,3 +238,18 @@ class TestPivotHistory:
             det.record_pivot_type(p, pt)
         assert set(det.recent_pivot_types()) == {"地域", "时节"}   # 10 天前的不算
         assert len(det.recent_pivot_types()) == 2                # 去重
+
+
+class TestAnonymousProtagonist:
+
+    def test_anonymous_fact_downgraded_to_legend(self):
+        t = _validate_tale(dict(MOCK_TALE_RESPONSE, tale="大中六年，蓝田县丞王某罢官归乡。" * 10))
+        assert t["kind"] == "传说"
+
+    def test_named_fact_kept(self):
+        t = _validate_tale(dict(MOCK_TALE_RESPONSE, tale="大中六年，蓝田县丞王维罢官归乡，某年再起。" * 10))
+        assert t["kind"] == "史实"
+
+    def test_legend_untouched(self):
+        t = _validate_tale(dict(MOCK_TALE_RESPONSE, kind="传说", tale="王某夜行。" * 20))
+        assert t["kind"] == "传说"
