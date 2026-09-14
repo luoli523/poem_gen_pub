@@ -7,6 +7,8 @@
 """
 
 import json
+
+from src.common.llm import log_usage
 import re
 
 SECTION_LABELS = {
@@ -149,6 +151,7 @@ async def get_story(poem: dict) -> dict | None:
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
         )
+        log_usage("故事", response)
 
         content = response.choices[0].message.content
         if not content:
@@ -318,6 +321,7 @@ async def get_tale(poem: dict, story: dict | None, recent_pivot_types: list[str]
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
         )
+        log_usage("衍生一则", response)
 
         content = response.choices[0].message.content
         if not content:
@@ -339,6 +343,7 @@ async def get_tale(poem: dict, story: dict | None, recent_pivot_types: list[str]
                 response_format={"type": "json_object"},
                 max_completion_tokens=llm["max_completion_tokens"],
             )
+            log_usage("衍生一则·扩写", response)
             content = response.choices[0].message.content
             expanded = _validate_tale(json.loads(content)) if content else None
             if expanded and len(expanded["tale"]) > len(tale["tale"]):

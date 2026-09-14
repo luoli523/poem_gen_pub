@@ -8,6 +8,8 @@
 """
 
 import json
+
+from src.common.llm import log_usage
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -340,6 +342,7 @@ async def get_poem(date_str: str) -> dict | None:
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
         )
+        log_usage("诗词·日期匹配", response)
 
         content = response.choices[0].message.content
         if content:
@@ -363,6 +366,7 @@ async def get_poem(date_str: str) -> dict | None:
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
         )
+        log_usage("诗词·随机推荐", response)
 
         content = response.choices[0].message.content
         if not content:
@@ -414,6 +418,7 @@ async def get_poem_by_name(name: str, date_str: str) -> dict | None:
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
         )
+        log_usage("诗词·指定", response)
 
         content = response.choices[0].message.content
         if not content:

@@ -62,7 +62,9 @@ jobs:
 
       - name: Run pipeline
         env:
-          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          # 代码里 GROK_API_KEY 优先于 OPENAI_API_KEY；现用 OpenAI，故不再注入 Grok key
+          # （secret 仍保留，回滚时把这一行加回来即可）
+          # GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TELEGRAM_ENABLED: ${{ secrets.TELEGRAM_ENABLED }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

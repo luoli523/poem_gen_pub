@@ -1,8 +1,8 @@
 # LLM 配置（兼容 OpenAI API 的服务均可使用，如 ChatGPT、Grok、DeepSeek 等）
 # 节气内容、诗词匹配均使用此配置
 openai:
-  #model: "gpt-5"                    # 模型名称（按实际服务填写，如 grok-3、deepseek-chat）
-  model: "grok-4-1-fast-reasoning"                    # 模型名称（按实际服务填写，如 grok-3、deepseek-chat）
+  model: "gpt-5.6-terra"             # 2026-09 起用 OpenAI；grok-4-1-fast-reasoning 已成 legacy 型号
+  # model: "grok-4-1-fast-reasoning" # 回滚：改回此行并在 daily-run.yml 的 env 里恢复 GROK_API_KEY
   max_completion_tokens: 16000       # 最大输出 token 数（含推理 token）
   # response_format 由各模块按需设置（节气/诗词=json_object）
 

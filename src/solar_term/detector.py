@@ -15,6 +15,7 @@ except ImportError:
     sxtwl = None
 
 from src.common.constants import JIEQI_NAMES
+from src.common.llm import log_usage
 
 # 节气所属季节
 _SEASON_MAP = {
@@ -89,6 +90,7 @@ async def _generate_via_llm(name: str, date_str: str, season: str) -> dict | Non
             response_format={"type": "json_object"},
             max_completion_tokens=llm["max_completion_tokens"],
         )
+        log_usage("节气", response)
 
         raw = response.choices[0].message.content
         data = json.loads(raw)
