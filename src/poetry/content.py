@@ -6,7 +6,12 @@ Instagram 文案和 Telegram 消息文案。
 注意：infographic prompt 由 LLM 动态生成，不在此模块中构建。
 """
 
+import re
 from pathlib import Path
+
+import yaml
+
+from src.poetry.story import SECTION_LABELS
 
 
 # ── Markdown 生成（作为 NotebookLM Source）──
@@ -104,3 +109,80 @@ def build_telegram_caption(poem: dict) -> str:
         f"🏷 {occasion}\n"
         f"🎎 风俗：{customs_short}\n"
     )
+
+
+# ── 站点内容页（Hugo）──
+
+_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\s]+')
+
+
+def site_page_filename(poem: dict) -> str:
+    """站点内容页文件名：YYYY-MM-DD-诗题.md，去掉文件名非法字符与空白。"""
+    title = _UNSAFE_FILENAME_CHARS.sub("", poem.get("title", "")) or "untitled"
+    return f"{poem.get('date', '')}-{title}.md"
+
+
+def generate_site_page(poem: dict, story: dict | None) -> str:
+    """生成 Hugo 内容页：frontmatter（分类索引用）+ 诗 + 赏析 + 背后的故事。
+
+    story 为 None 时仍生成页面，故事部分留待以后用 --poem 回补。
+    """
+    sections = (story or {}).get("sections", {})
+    summary = (story or {}).get("summary", "")
+
+    present_categories = [SECTION_LABELS[k] for k, items in sections.items() if items]
+    present_kinds = sorted({i["kind"] for items in sections.values() for i in items})
+
+    front = {
+        "title": poem["title"],
+        "date": poem.get("date", ""),
+        "author": poem["author"],
+        "dynasty": poem["dynasty"],
+        "occasion": poem.get("occasion", ""),
+        "authors": [poem["author"]],
+        "dynasties": [poem["dynasty"]],
+        "occasions": [poem["occasion"]] if poem.get("occasion") else [],
+        "categories": present_categories,
+        "kinds": present_kinds,
+        "summary": summary,
+    }
+    front_text = yaml.safe_dump(front, allow_unicode=True, sort_keys=False).rstrip()
+
+    customs_text = "\n".join(f"- {c}" for c in poem.get("customs", []))
+
+    body = [
+        f"---\n{front_text}\n---",
+        "",
+        f"**{poem['dynasty']}·{poem['author']}** · {poem.get('occasion', '')}",
+        "",
+        "## 诗词全文",
+        "",
+        poem["full_text"],
+        "",
+        "## 赏析",
+        "",
+        poem["meaning"],
+    ]
+    if customs_text:
+        body += ["", "## 相关风俗", "", customs_text]
+
+    body += ["", "## 背后的故事", ""]
+    if story is None:
+        body.append("_暂未生成，可用 `--poem` 回补。_")
+    else:
+        if summary:
+            body += [f"> {summary}", ""]
+        for key, label in SECTION_LABELS.items():
+            items = sections.get(key, [])
+            if not items:
+                continue
+            body += [f"### {label}", ""]
+            for item in items:
+                tag = f"〔{item['kind']}"
+                if item["source"]:
+                    tag += f" · {item['source']}"
+                tag += "〕"
+                body.append(f"- {item['text']} {tag}")
+            body.append("")
+
+    return "\n".join(body).rstrip() + "\n"

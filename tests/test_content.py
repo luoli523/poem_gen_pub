@@ -73,3 +73,64 @@ class TestPoetryContent:
         poem = {**sample_poem, "meaning": "赏析" * 200}
         caption = poetry_ig(poem)
         assert "……" in caption
+
+
+class TestPoetrySitePage:
+
+    @pytest.fixture
+    def sample_story(self):
+        return {
+            "summary": "丙辰中秋，苏轼大醉，兼怀子由。",
+            "sections": {
+                "author_anecdote": [{"text": "兄弟情深。", "kind": "史实", "source": "《宋史》"}],
+                "composition": [],
+                "era_context": [],
+                "customs": [{"text": "宋人玩月至晓。", "kind": "传说", "source": ""}],
+                "legends": [],
+                "allusions": [],
+            },
+        }
+
+    def test_filename_strips_unsafe_chars(self, sample_poem):
+        from src.poetry.content import site_page_filename
+        poem = dict(sample_poem, title="水调歌头·明月几时有 / 试:题?")
+        assert site_page_filename(poem) == "2026-10-04-水调歌头·明月几时有试题.md"
+
+    def test_filename_empty_title(self, sample_poem):
+        from src.poetry.content import site_page_filename
+        assert site_page_filename(dict(sample_poem, title="???")) == "2026-10-04-untitled.md"
+
+    def test_page_with_story(self, sample_poem, sample_story):
+        import yaml
+        from src.poetry.content import generate_site_page
+        page = generate_site_page(sample_poem, sample_story)
+
+        _, front_text, body = page.split("---\n", 2)
+        front = yaml.safe_load(front_text)
+        assert front["title"] == "水调歌头·明月几时有"
+        assert front["authors"] == ["苏轼"]
+        assert front["dynasties"] == ["宋"]
+        assert front["occasions"] == ["中秋节"]
+        assert front["categories"] == ["作者轶事", "风土人情"]
+        assert front["kinds"] == ["传说", "史实"]
+        assert front["summary"] == sample_story["summary"]
+
+        assert "## 诗词全文" in body
+        assert "## 赏析" in body
+        assert "- 赏月" in body
+        assert "> 丙辰中秋" in body
+        assert "### 作者轶事" in body
+        assert "〔史实 · 《宋史》〕" in body
+        assert "〔传说〕" in body
+        assert "### 本事与创作背景" not in body  # 空分类不渲染
+
+    def test_page_without_story(self, sample_poem):
+        import yaml
+        from src.poetry.content import generate_site_page
+        page = generate_site_page(sample_poem, None)
+        _, front_text, body = page.split("---\n", 2)
+        front = yaml.safe_load(front_text)
+        assert front["categories"] == []
+        assert front["kinds"] == []
+        assert front["summary"] == ""
+        assert "暂未生成" in body

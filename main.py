@@ -28,9 +28,12 @@ from src.solar_term.content import (
 
 # ── 诗词模块 ──
 from src.poetry.detector import get_poem, get_poem_by_name
+from src.poetry.story import get_story
 from src.poetry.content import (
     generate_markdown as poetry_generate_markdown,
     build_ig_caption as poetry_build_ig_caption,
+    generate_site_page as poetry_generate_site_page,
+    site_page_filename as poetry_site_page_filename,
 )
 
 
@@ -153,6 +156,25 @@ async def _run_content_pipeline(
             print(f"  ⏭ Instagram 未配置，跳过{label}发布")
 
 
+# ── 诗词故事 + 站点内容页 ──
+
+
+async def _write_poem_site_page(poem: dict, site_dir: Path) -> None:
+    """生成诗词背后的故事，写入 Hugo 内容页（故事失败时仍写入仅含诗词的页面）。"""
+    print("\n📖 正在生成诗词背后的故事...")
+    story = await get_story(poem)
+    if story:
+        n = sum(len(v) for v in story["sections"].values())
+        print(f"  ✅ 故事生成完成：{n} 条素材")
+    else:
+        print("  ⚠ 故事生成失败，内容页将不含故事")
+
+    page_file = site_dir / poetry_site_page_filename(poem)
+    page_file.parent.mkdir(parents=True, exist_ok=True)
+    page_file.write_text(poetry_generate_site_page(poem, story), encoding="utf-8")
+    print(f"  📄 站点内容页: {page_file}")
+
+
 # ── 主流程 ──
 
 
@@ -187,6 +209,7 @@ async def main():
     config = load_config()
     output_dir = Path(config["output"]["dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
+    site_dir = Path(config["site"]["content_dir"])
 
     # NotebookLM 认证检测
     nlm_auth_failed = False
@@ -244,6 +267,7 @@ async def main():
         if poem:
             print(f"📜 诗词：《{poem['title']}》（{poem['dynasty']}·{poem['author']}）")
             occasion = poem.get("occasion", "自选诗词")
+            await _write_poem_site_page(poem, site_dir)
             await _run_content_pipeline(
                 label="诗词",
                 data=poem,
@@ -265,6 +289,7 @@ async def main():
         if poem:
             occasion = poem.get("occasion", "诗词")
             print(f"📜 今日诗词：《{poem['title']}》（{poem['dynasty']}·{poem['author']}）— {occasion}")
+            await _write_poem_site_page(poem, site_dir)
             await _run_content_pipeline(
                 label="诗词",
                 data=poem,

@@ -9,3 +9,7 @@ openai:
 # 输出配置
 output:
   dir: "./output"
+
+# 站点内容（Hugo 内容页，每日诗词 + 背后的故事，提交回 repo 持续积累）
+site:
+  content_dir: "./site/content/poems"

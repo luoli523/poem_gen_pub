@@ -2,7 +2,10 @@ __pycache__/
 *.pyc
 .env
 output/
-data/
+data/*
+!data/poem_history.json
+site/public/
+site/resources/
 .venv/
 *.egg-info/
 dist/
