@@ -29,5 +29,16 @@
     <p class="all"><a href="{{ (site.GetPage "/poems").RelPermalink }}">全部 {{ len $poems }} 首</a></p>
   </section>
 {{ end }}
+{{ $terms := where site.RegularPages "Section" "terms" }}
+{{ with $terms }}
+  <section class="recent">
+    <h2>节令</h2>
+    {{/* 最近积累的节令，按名分组，最多 8 个 */}}
+    {{ $recentNames := slice }}{{ range .ByDate.Reverse }}{{ if and (lt (len $recentNames) 8) (not (in $recentNames .Params.jieling_name)) }}{{ $recentNames = $recentNames | append .Params.jieling_name }}{{ end }}{{ end }}
+    {{ $groups := where (.GroupByParam "jieling_name") "Key" "in" $recentNames }}
+    {{ partial "term-rows.html" $groups }}
+    <p class="all"><a href="{{ (site.GetPage "/terms").RelPermalink }}">全部节令</a></p>
+  </section>
+{{ end }}
 </main>
 {{ end }}
