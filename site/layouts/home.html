@@ -11,9 +11,9 @@
     {{ end }}
     <div class="today-text">
       {{ $m := strings.FindRESubmatch `(?s)<h2 id="诗词全文">.*?</h2>\s*<p>(.*?)</p>` (.Content | string) 1 }}
-      {{ with $m }}<p class="poem">{{ index (index . 0) 1 | safeHTML }}</p>{{ end }}
+      {{ with $m }}<p class="poem">{{ partial "poem-lines.html" (index (index . 0) 1) }}</p>{{ end }}
       <h1 class="today-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h1>
-      <p class="today-meta">{{ .Params.dynasty }}·{{ .Params.author }}<span>{{ .Date.Format "2006年1月2日" }}</span>{{ with .Params.occasion }}<span>{{ . }}</span>{{ end }}</p>
+      <p class="today-meta">{{ with site.GetPage (printf "/authors/%s" .Params.author) }}<a class="seal seal-inline" href="{{ .RelPermalink }}" aria-label="作者 {{ .Title }}">{{ .Title }}</a>{{ end }}{{ .Params.dynasty }}·{{ .Params.author }}<span>{{ .Date.Format "2006年1月2日" }}</span>{{ with .Params.occasion }}<span>{{ . }}</span>{{ end }}</p>
       {{ with .Params.summary }}<p class="today-summary">{{ . }}</p>{{ end }}
       <a class="more" href="{{ .RelPermalink }}">读这首的背后</a>
     </div>

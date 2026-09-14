@@ -1,4 +1,4 @@
-/* 诗词背后 —— 版式取自宋版书：界行、版心、眉批、卷首竖题、卷末一印 */
+/* 鬼话诗 —— 版式取自宋版书：界行、版心、眉批、卷首竖题、卷末一印 */
 
 :root {
   --paper: #e8e7e1;      /* 竹纸：偏冷灰 */
@@ -51,7 +51,8 @@ main { max-width: 72rem; margin: 0 auto; padding-block: 2.5rem 4rem; }
 .today-text .poem { margin-top: 0; max-width: 30em; font-size: 1.4rem; }
 .today-title { font-family: var(--kai); font-size: 2rem; font-weight: 400; margin-top: 1.5rem; }
 .today-title a { color: var(--ink); }
-.today-meta { color: var(--ink-2); margin: .25rem 0 1.5rem; }
+.today-meta { color: var(--ink-2); margin: .25rem 0 1.5rem; display: flex; align-items: center; flex-wrap: wrap; }
+.today-meta .seal-inline { margin: 0 1em 0 0; padding: .4em .3em; font-size: .8rem; }   /* 首页一印：竖排小印，与书脊同制 */
 .today-meta span { margin-left: 1.4em; }
 .today-summary { max-width: var(--measure); }
 .more { display: inline-block; margin-top: .5rem; border-bottom: 1px solid currentColor; }
@@ -104,7 +105,7 @@ main { max-width: 72rem; margin: 0 auto; padding-block: 2.5rem 4rem; }
 .body h3 { font-size: 1.05rem; font-weight: 600; margin: 1.8rem 0 .5rem; }
 .body p, .body ul, .body blockquote { max-width: var(--measure); }
 .body p { margin: 0 0 1em; }
-.body .poem { font-family: var(--kai); font-size: 1.55rem; line-height: 2.05; letter-spacing: .04em; max-width: none; margin-bottom: 1.5rem; }
+.body .poem { font-family: var(--kai); font-size: 1.55rem; line-height: 2.05; letter-spacing: .04em; max-width: none; margin-bottom: 1.5rem; text-wrap: balance; }
 .body blockquote { margin: 0 0 1.5rem; padding-left: 1rem; border-left: 1px solid var(--rule); color: var(--ink-2); }
 .body ul { list-style: none; padding: 0; margin: 0 0 1em; }
 .body li { margin-bottom: .6em; }

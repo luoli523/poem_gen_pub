@@ -1,7 +1,7 @@
 baseURL: "https://luoli523.github.io/poem_gen_pub/"
 languageCode: zh-cn
 defaultContentLanguage: zh-cn
-title: 诗词背后
+title: 鬼话诗
 enableRobotsTXT: true
 hasCJKLanguage: true
 buildFuture: true   # 流水线在 UTC 23:00 以北京日期落页，对 UTC 构建来说是"未来"
