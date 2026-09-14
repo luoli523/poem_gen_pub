@@ -21,11 +21,13 @@ kinds:
 - 存疑
 pivot_types: []
 tale_title: ''
-infographic: ''
+infographic: infographic.webp
 summary: 这首诗最有料处，不在“秋山秋水”的静景本身，而在末联把眼前友人忽然化作楚狂接舆、陶潜五柳：辋川并非与世隔绝的空山，而是长安官僚王维与诗友裴迪经营出来的半仕半隐空间。柴门、孤烟、暮蝉，既是山居实景，也是一套有来历的隐逸语言。
 ---
 
 **唐·王维** · 仲秋山居晚景
+
+![辋川闲居赠裴秀才迪 信息图](infographic.webp)
 
 ## 诗词全文
 
