@@ -46,6 +46,17 @@ small { font-weight: 400; color: var(--ink-2); }
 .masthead nav { display: flex; flex-wrap: wrap; gap: 0 1.4rem; margin-left: auto; }
 .masthead nav a { color: var(--ink-2); padding-block: .2em; }
 .masthead nav a[aria-current] { color: var(--ink); border-bottom: 2px solid var(--ink); }
+.site-search input {
+  font: inherit; font-size: .95rem; color: var(--ink); background: transparent;
+  border: 0; border-bottom: 1px solid var(--rule); padding: .2em 0 .2em 1.4em; width: 12em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a6f7d' stroke-width='1.6'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 0 55% / 1em;
+  transition: width .15s, border-color .15s;
+}
+.site-search input:focus { outline: 0; border-bottom-color: var(--indigo); width: 18em; }
+.site-search input::placeholder { color: var(--ink-2); opacity: .8; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 60rem) { .site-search { flex-basis: 100%; } .site-search input { width: 100%; } .site-search input:focus { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .site-search input { transition: none; } }
 
 main { max-width: 72rem; margin: 0 auto; padding-block: 2.5rem 4rem; }
 .colophon { max-width: 72rem; margin: 0 auto; padding-block: 2rem 3rem; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: .9rem; }

@@ -5,4 +5,8 @@
     <a href="{{ .URL }}"{{ if or ($.IsMenuCurrent "main" .) ($.HasMenuCurrent "main" .) }} aria-current="page"{{ end }}>{{ .Name }}</a>
     {{ end }}
   </nav>
+  <form class="site-search" role="search" action="{{ (site.GetPage "/search").RelPermalink }}" method="get">
+    <label class="visually-hidden" for="q">搜索诗词与节令</label>
+    <input id="q" name="q" type="search" placeholder="搜诗题、作者、字句、出处" autocomplete="off"{{ if eq .Layout "search" }} autofocus{{ end }}>
+  </form>
 </header>

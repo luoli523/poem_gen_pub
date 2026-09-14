@@ -7,7 +7,7 @@
     <p class="spine-date"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "1月2日" }}</time></p>
     {{ with site.GetPage (printf "/jieling/%s" .Params.jieling_name) }}<p class="spine-occ"><a href="{{ .RelPermalink }}">同日诗词</a></p>{{ end }}
     {{ $sealText := .Params.ethnic | default .Params.category }}
-    {{ with site.GetPage (printf "/jieling_categories/%s" $sealText) }}<a class="seal" href="{{ .RelPermalink }}" aria-label="{{ $sealText }}" data-pagefind-meta="category">{{ $sealText }}</a>{{ end }}
+    {{ with site.GetPage (printf "/jieling_categories/%s" $sealText) }}<a class="seal" href="{{ .RelPermalink }}" aria-label="{{ $sealText }}" data-pagefind-meta="类别">{{ $sealText }}</a>{{ end }}
   </aside>
   <article class="body">
     {{ partial "poem-body.html" . }}

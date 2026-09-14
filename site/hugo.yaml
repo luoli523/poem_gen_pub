@@ -46,9 +46,6 @@ menu:
     - name: 可信度
       pageRef: /kinds
       weight: 6
-    - name: 搜索
-      pageRef: /search
-      weight: 9
 
 params:
   description: 每日一首古诗词，以及它背后的人、事、风土与传说。每条素材标注可信度与出处。
