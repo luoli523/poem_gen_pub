@@ -6,6 +6,11 @@ on:
     - cron: "0 23 * * *"
   workflow_dispatch:
     # 支持手动触发
+    inputs:
+      dry_run:
+        description: "只生成内容并提交，不跑 NotebookLM / Telegram / Instagram（调 prompt 用）"
+        type: boolean
+        default: false
 
 jobs:
   generate:
@@ -64,7 +69,7 @@ jobs:
           IG_ENABLED: ${{ secrets.IG_ENABLED }}
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
-        run: python main.py
+        run: python main.py ${{ inputs.dry_run && '--no-nlm --no-ig' || '' }}
 
       - name: Commit generated content
         if: always()

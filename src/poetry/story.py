@@ -180,7 +180,10 @@ TALE_SYSTEM_PROMPT = """\
 
 【最重要的一条】惊喜来自"选点刁"，不来自"材料冷"。
 - 选点要出人意料：从"锦瑟"可以跳到唐代乐工的行会，从"扬州"可以跳到盐商家里的一个婢女
-- 但选定之后，只讲你真正读过、流传广、能说清出处的故事；宁可是名篇，不要冷门
+- 但选定之后，只讲你真正读过、能说清出处的故事；把握不足的冷门材料不要碰
+- 也避开中学课本级别人尽皆知的故事（屈原投江、李白捉月、兰亭雅集之类）；
+  目标读者是文学爱好者，要让他觉得"原来还有这一段"——笔记小说里的次要人物、
+  正史列传里的一桩小事、名人身边的无名者，往往正是这样的材料
 - 你不熟的书不要引，记不清的事不要讲；不确定某书是否真有此条，就不要写成"载于某书"
 - 绝不虚构：不得编造人物、情节、书名、篇卷；不得给一个现编的故事配上像真的出处
 - 匿名主角（"王某""一少年"）的故事不得标"史实"，最高只能标"传说"
@@ -227,6 +230,17 @@ TALE_USER_TEMPLATE = """\
 近期已用过的衍生类型（请尽量避开）：{recent_pivot_types}
 
 请讲一则衍生出来的故事。"""
+
+
+TALE_MIN_CHARS = 350
+
+TALE_EXPAND_TEMPLATE = """\
+下面这稿只有 {n} 字，不到要求的 400-800 字。请保持同一个故事、同一出处、同一 kind，
+扩写到 400-800 字：补足人物的处境与动机、具体的时间地点、一两处对话或细节、情节的转折。
+不得为凑字数添加你没有把握的情节。仍按同一 JSON schema 返回。
+
+上一稿：
+{draft}"""
 
 
 def _validate_tale(data: dict) -> dict | None:
@@ -310,7 +324,26 @@ async def get_tale(poem: dict, story: dict | None, recent_pivot_types: list[str]
             print("  ⚠ LLM 衍生故事返回为空")
             return None
 
-        return _validate_tale(json.loads(content))
+        tale = _validate_tale(json.loads(content))
+        if tale and len(tale["tale"]) < TALE_MIN_CHARS:
+            # 模型常忽略篇幅要求；带着上一稿要求扩写一次
+            print(f"  ↻ 衍生故事仅 {len(tale['tale'])} 字，要求扩写...")
+            response = await client.chat.completions.create(
+                model=llm["model"],
+                messages=[
+                    {"role": "system", "content": TALE_SYSTEM_PROMPT},
+                    {"role": "user", "content": TALE_EXPAND_TEMPLATE.format(
+                        n=len(tale["tale"]), draft=json.dumps(tale, ensure_ascii=False),
+                    )},
+                ],
+                response_format={"type": "json_object"},
+                max_completion_tokens=llm["max_completion_tokens"],
+            )
+            content = response.choices[0].message.content
+            expanded = _validate_tale(json.loads(content)) if content else None
+            if expanded and len(expanded["tale"]) > len(tale["tale"]):
+                tale = expanded
+        return tale
 
     except ImportError:
         print("  ⚠ openai 库未安装，无法生成衍生故事")

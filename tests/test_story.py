@@ -131,7 +131,7 @@ MOCK_TALE_RESPONSE = {
     "pivot": "扬州盐商",
     "pivot_type": "地域",
     "title": "程氏义仓",
-    "tale": "乾隆年间，扬州盐商程晋芳……" * 20,
+    "tale": "乾隆年间，扬州盐商程晋芳……" * 30,
     "connection": "杜牧诗中的扬州繁华，正建立在盐运之上。",
     "kind": "史实",
     "source": "《扬州画舫录·卷九》",
@@ -253,3 +253,46 @@ class TestAnonymousProtagonist:
     def test_legend_untouched(self):
         t = _validate_tale(dict(MOCK_TALE_RESPONSE, kind="传说", tale="王某夜行。" * 20))
         assert t["kind"] == "传说"
+
+
+class TestTaleExpansion:
+
+    @pytest.mark.asyncio
+    async def test_short_tale_triggers_one_expansion(self, monkeypatch, sample_poem):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        short = dict(MOCK_TALE_RESPONSE, tale="屈原投江。" * 10)          # 50 字
+        long_ = dict(MOCK_TALE_RESPONSE, tale="屈原被放逐江南，行吟泽畔。" * 40)
+        mock_create = AsyncMock(side_effect=[_mock_llm_response(short), _mock_llm_response(long_)])
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = mock_create
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            tale = await get_tale(sample_poem, None, [])
+
+        assert mock_create.call_count == 2
+        assert tale["tale"] == long_["tale"]
+        expand_msg = mock_create.call_args_list[1].kwargs["messages"][1]["content"]
+        assert "只有 50 字" in expand_msg
+        assert "屈原投江" in expand_msg                                    # 带着上一稿
+
+    @pytest.mark.asyncio
+    async def test_expansion_not_shorter_keeps_original(self, monkeypatch, sample_poem):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        short = dict(MOCK_TALE_RESPONSE, tale="屈原投江。" * 10)
+        worse = dict(MOCK_TALE_RESPONSE, tale="短。")
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(
+            side_effect=[_mock_llm_response(short), _mock_llm_response(worse)])
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            tale = await get_tale(sample_poem, None, [])
+        assert tale["tale"] == short["tale"]
+
+    @pytest.mark.asyncio
+    async def test_long_enough_no_expansion(self, monkeypatch, sample_poem):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_TALE_RESPONSE))  # 420 字
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = mock_create
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            await get_tale(sample_poem, None, [])
+        assert mock_create.call_count == 1
