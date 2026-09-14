@@ -25,14 +25,17 @@ flowchart TD
         KEY -- 否 --> TGNO[TG「当日未执行」] --> RED
         KEY -- 是 --> CHK[check_auth NotebookLM]
         CHK -- 失败 --> P1[/记入 problems<br/>本次跳过所有信息图/] --> JQ
-        CHK -- 通过 --> JQ{今天是节气?}
+        CHK -- 通过 --> JQ{今天有节令?<br/>节气 / 汉族节日 / 民族节日}
 
-        JQ -- 是 --> JQGEN[LLM 生成节气内容] --> PIPE1[通用管线 ▶] --> SLEEP[sleep 30s] --> POEM
+        JQ -- 是 --> PREV[读往年同名 story.json<br/>作排除] --> JQGEN[LLM 节令素材<br/>六类 · kind · source · 信息图 prompt] --> JPAGE[先落档案页<br/>terms/⟨名⟩/⟨年⟩/ + story.json] --> PIPE1[通用管线 ▶] --> JIMG[补图]
+        JIMG --> MORE{还有同日节令?}
+        MORE -- 是 --> SLEEP0[sleep 30s] --> PREV
+        MORE -- 否 --> SLEEP[sleep 30s] --> POEM
         JQ -- 否 --> POEM
 
         POEM[取诗 get_poem<br/>① 排除近 90 天 → 日期关联名篇<br/>② 无关联 → 随机应季] --> POK{有诗?}
         POK -- 否 --> P2[/记入 problems/] --> END
-        POK -- 是 --> HIST[写入 poem_history.json] --> STORY[背后的故事 get_story<br/>六类 · kind · source<br/>史实无出处 → 存疑]
+        POK -- 是 --> HIST[写入 poem_history.json] --> STORY[背后的故事 get_story<br/>六类 · kind · source<br/>史实无出处 → 存疑<br/>frontmatter 带当天节令名]
         STORY -- 失败 --> P3[/记入 problems/] --> PAGE1
         STORY -- 成功 --> PAGE1[先落页面 ⟨日期-诗题⟩/index.md<br/><b>无图</b>]
         PAGE1 --> PIPE2[通用管线 ▶]
@@ -78,7 +81,7 @@ flowchart TD
 
 - 橙色方块是四个降级记录点，任一触发，结尾都走红色 `exit 1` 并发一条 Telegram 汇总；但**提交与发布照常执行**（`if: always()`），红色的一天仍然有页面上线。
 - **「先落页面」在通用管线之前**：NotebookLM 那一整块无论怎么坏，当天的诗和考据已经在磁盘上等着被提交。
-- 通用管线被节气和诗词共用；节气那次的产物只推送、不进 git、不进站点。
+- 通用管线被节令和诗词共用。节令按"每节令每年一页"积累（`terms/<名>/<年>/`），往年要点回喂作排除；同日多个节令逐个生成，间隔 30s。
 - 衍生一则（`get_tale`）由 `config.yaml` 的 `tale.enabled` 控制，目前关闭，图里未画。
 
 ## 一、准备（约 1 分钟）
@@ -108,9 +111,17 @@ flowchart TD
 
 `check_auth()` 失败 → 本次全部信息图跳过，记入 problems（附修复指引）。不中止。
 
-### 2. 节气分支（仅节气日）
+### 2. 节令分支（一年约 50 天）
 
-`sxtwl` 判断今天是否节气 → 是则 LLM 生成节气介绍、习俗、饮食、养生、信息图 prompt → 走通用管线 → 信息图未生成则记入 problems。节气内容目前不进站点、不进 git，只推 Telegram / Instagram。节气日且 NLM 可用时，随后 `sleep 30s` 避免限流。
+`get_jieling(today)` 每天本地计算（不调 LLM）：sxtwl 判节气，zhdate 换算农历查表判汉族与少数民族节日，寒食按清明前一日，泼水节按公历，藏历新年 / 开斋节 / 古尔邦节按年硬编码。同日可能多个，逐个处理：
+
+1. 读 `terms/<名>/` 下往年的 `story.json`，压成要点清单
+2. LLM 一次调用：六类素材（名义与物候 / 历代风俗 / 饮食与器物 / 诗文中的它 / 人物与传说 / 方志记载，每条 kind + source）+ 引子 + 信息图 prompt，往年要点作排除；少数民族节日要求写明民族、地域、仪式与具名人物
+3. 先落档案页 `terms/<名>/<年>/index.md` + `story.json`（无图）
+4. 通用管线 → 图转 WebP 存入同目录 → 重写页面加图
+5. 失败记入 problems；多个节令之间 `sleep 30s`
+
+节令日且 NLM 可用时，进入诗词分支前再 `sleep 30s`。当天诗词页 frontmatter 带 `jieling: [名]`，与档案页互链。
 
 ### 3. 诗词分支
 
@@ -129,7 +140,7 @@ flowchart TD
 
 **3e. 补图**——PNG → WebP（原尺寸、q85）存入同目录 `infographic.webp`，重写页面加上图。未拿到图且未主动跳过 → 记入 problems。
 
-### 4. 通用管线 `_run_content_pipeline`（节气 / 诗词共用）
+### 4. 通用管线 `_run_content_pipeline`（节令 / 诗词共用）
 
 1. 生成 NotebookLM 用的 Markdown 到 `output/`，prompt 另存 `.prompt.txt`
 2. NotebookLM：查找/创建 notebook → 上传 Markdown 为 source → 创建 infographic（最多 3 次重试，退避 10s/20s）→ 等待完成（超时 300s）→ 重命名 artifact → 下载 PNG。整段 try/except：任何异常 → 返回 None
@@ -151,9 +162,9 @@ flowchart TD
 
 ## 四、每次运行的产出
 
-- **git**：一个 bundle 目录（`index.md` + `infographic.webp`）+ `poem_history.json` 一条记录
+- **git**：诗词 bundle（`index.md` + `infographic.webp`）+ `poem_history.json` 一条记录；节令日另加 `terms/<名>/<年>/`（`index.md` + `story.json` + 图）
 - **站点**：新诗页 + 六个索引维度自动更新 + 搜索索引
-- **Telegram**：节气图文（如有）+ 诗词图文；有降级则再加一条汇总
+- **Telegram**：节令图文（如有）+ 诗词图文；有降级则再加一条汇总
 - **Instagram**：同上图文（若启用）
 - **Actions**：绿 = 完整一天；红 = 有降级，Telegram 里有原因
 
@@ -162,7 +173,8 @@ flowchart TD
 | 失败点 | 结果 |
 |---|---|
 | 依赖安装 / checkout | 当天无产出，run 红，无 Telegram（pipeline 未启动） |
-| NLM 认证（step 或 check） | 有诗、有考据、有页面，无图；TG 汇总；红 |
+| NLM 认证（step 或 check） | 有诗、有考据、有页面（含节令档案），无图；TG 汇总；红 |
+| 节令素材 | 档案页落地但无内容；TG 汇总；红（可 `--date` 回补） |
 | 取诗 | 当天无诗词页；TG 汇总；红 |
 | 故事 | 有诗页无故事节；TG 汇总；红 |
 | NLM 生成 / 超时 / 异常 | 页面无图；TG 汇总；红 |
@@ -175,4 +187,5 @@ flowchart TD
 - **升级依赖**：按 `requirements.lock` 头部注释重新生成，然后 dispatch 一次 `dry_run`
 - **NotebookLM master token 失效**：本地 `notebooklm login --master-token --account <邮箱>`，然后 `base64 -i ~/.notebooklm/profiles/default/master_token.json | gh secret set NOTEBOOKLM_MASTER_TOKEN`
 - **回补某首诗**：本地 `python main.py --poem 诗题 --no-nlm --no-ig`，提交生成的目录
+- **回补某个节令日**：dispatch 填 `date=YYYY-MM-DD`、勾 `only_jieling`（可配 `dry_run`）；信息图用 `scripts/backfill_infographic.py` 从 artifact 补
 - **调 prompt**：dispatch 勾 `dry_run`，看提交回来的页面，不打扰 Telegram / Instagram

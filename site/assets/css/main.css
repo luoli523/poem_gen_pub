@@ -57,6 +57,10 @@ main { max-width: 72rem; margin: 0 auto; padding-block: 2.5rem 4rem; }
 .today-summary { max-width: var(--measure); }
 .more { display: inline-block; margin-top: .5rem; border-bottom: 1px solid currentColor; }
 .recent { margin-top: 4rem; }
+.term-highlight { margin-bottom: 2.5rem; }
+.term-highlight .today-title { margin-top: 0; }
+.term-highlight .today-title small { font-family: var(--song); font-size: 1rem; margin-left: .8em; }
+.today-meta .seal-inline + span { margin-left: 0; }   /* 印章之后的第一项不再留间距 */
 .recent h2, .listing h1, .index h1 { font-family: var(--kai); font-weight: 400; font-size: 1.6rem; margin-bottom: 1rem; }
 .listing h1 small, .index h1 small { font-family: var(--song); font-size: .95rem; margin-left: 1em; }
 .all { margin-top: 1.25rem; }
