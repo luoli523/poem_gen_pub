@@ -1,6 +1,6 @@
 {{- $img := .Page.Resources.Get .Destination -}}
 {{- with $img -}}
-<figure class="infographic"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Text }}" loading="lazy" decoding="async"></figure>
+<figure class="infographic"><a class="zoom-link" href="{{ .RelPermalink }}" data-alt="{{ $.Text }}" title="点击放大"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Text }}" loading="lazy" decoding="async"></a></figure>
 {{- else -}}
 <img src="{{ .Destination | safeURL }}" alt="{{ .Text }}">
 {{- end -}}

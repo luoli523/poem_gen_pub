@@ -4,16 +4,30 @@
     <h1 class="spine-title">{{ .Title }}</h1>
     <p class="spine-who">{{ .Params.dynasty }}·{{ .Params.author }}</p>
     <p class="spine-date"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006年1月2日" }}</time></p>
-    {{ with .Params.occasion }}<p class="spine-occ"><a href="{{ "/occasions/" | relURL }}{{ . | urlize }}/">{{ . }}</a></p>{{ end }}
-    <a class="seal" href="{{ "/authors/" | relURL }}{{ .Params.author | urlize }}/" aria-label="作者 {{ .Params.author }}" data-pagefind-meta="author">{{ .Params.author }}</a>
+    {{ with .Params.occasion }}{{ with site.GetPage (printf "/occasions/%s" .) }}<p class="spine-occ"><a href="{{ .RelPermalink }}">{{ .Title }}</a></p>{{ end }}{{ end }}
+    {{ with site.GetPage (printf "/authors/%s" .Params.author) }}<a class="seal" href="{{ .RelPermalink }}" aria-label="作者 {{ .Title }}" data-pagefind-meta="author">{{ .Title }}</a>{{ end }}
   </aside>
   <article class="body">
     {{ partial "poem-body.html" . }}
     {{ with .Params.categories }}
     <nav class="tail" aria-label="本页素材分类">
-      {{ range . }}<a href="{{ "/categories/" | relURL }}{{ . | urlize }}/">{{ . }}</a>{{ end }}
+      {{ range . }}{{ with site.GetPage (printf "/categories/%s" .) }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }}{{ end }}
     </nav>
     {{ end }}
   </article>
 </main>
+<dialog class="zoom" id="zoom" aria-label="放大查看信息图"><img alt=""><p>点击任意处或按 Esc 关闭</p></dialog>
+<script>
+  (function () {
+    var dlg = document.getElementById('zoom'); if (!dlg || !dlg.showModal) return;
+    var img = dlg.querySelector('img');
+    document.querySelectorAll('a.zoom-link').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault(); img.src = a.href; img.alt = a.getAttribute('data-alt') || ''; dlg.showModal();
+      });
+    });
+    dlg.addEventListener('click', function () { dlg.close(); });
+    dlg.addEventListener('close', function () { img.removeAttribute('src'); });
+  })();
+</script>
 {{ end }}

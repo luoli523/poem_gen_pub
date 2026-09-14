@@ -25,7 +25,7 @@
   <section class="recent">
     <h2>近日</h2>
     {{ partial "poem-rows.html" (first 10 .) }}
-    <p class="all"><a href="{{ "/poems/" | relURL }}">全部 {{ len $poems }} 首</a></p>
+    <p class="all"><a href="{{ (site.GetPage "/poems").RelPermalink }}">全部 {{ len $poems }} 首</a></p>
   </section>
 {{ end }}
 </main>

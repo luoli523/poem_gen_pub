@@ -12,16 +12,9 @@
   --song: "Noto Serif SC", "Songti SC", "SimSun", "Source Han Serif SC", serif;
   --measure: 34em;       /* 正文行长上限 */
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #1b1d24; --paper-2: #23262f;
-    --ink: #d9d8d0; --ink-2: #9a9ea9;
-    --rule: #3a3d47; --indigo: #8fa6d1; --cinnabar: #c9573f;
-  }
-}
 
 *, *::before, *::after { box-sizing: border-box; }
-html { color-scheme: light dark; }
+html { color-scheme: light; }   /* 站的身份是纸上的墨，全端一致，不跟随系统深色 */
 body {
   margin: 0; background: var(--paper); color: var(--ink);
   font: 17px/1.95 var(--song); font-feature-settings: "palt";
@@ -118,6 +111,13 @@ main { max-width: 72rem; margin: 0 auto; padding-block: 2.5rem 4rem; }
 .body li:not(.noted)::before { content: "—"; color: var(--ink-2); margin-right: .5em; }
 .infographic { margin: 0 0 2.5rem; max-width: var(--measure); }
 .infographic img { border: 1px solid var(--rule); }
+.zoom-link { display: block; cursor: zoom-in; }
+dialog.zoom { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; margin: 0;
+  display: none; place-items: center; cursor: zoom-out; }
+dialog.zoom[open] { display: grid; }
+dialog.zoom::backdrop { background: rgba(30, 34, 48, .92); }
+dialog.zoom img { max-width: min(96vw, 1536px); max-height: 92vh; width: auto; height: auto; box-shadow: 0 0 0 1px var(--rule); }
+dialog.zoom p { position: fixed; bottom: .8rem; left: 0; right: 0; text-align: center; margin: 0; color: var(--paper); font-size: .85rem; opacity: .7; }
 .tail { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: .3em 1.6em; color: var(--ink-2); }
 
 /* 眉批：正文右侧一栏，界行相隔 */
