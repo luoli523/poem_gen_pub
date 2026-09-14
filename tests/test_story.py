@@ -121,3 +121,120 @@ class TestGetStory:
 
         with patch("openai.AsyncOpenAI", return_value=mock_client):
             assert await get_story(sample_poem) is None
+
+
+# ── 衍生一则 ──
+
+from src.poetry.story import _validate_tale, _covered_points, get_tale, PIVOT_TYPES  # noqa: E402
+
+MOCK_TALE_RESPONSE = {
+    "pivot": "扬州盐商",
+    "pivot_type": "地域",
+    "title": "程氏义仓",
+    "tale": "乾隆年间，扬州盐商程某……" * 20,
+    "connection": "杜牧诗中的扬州繁华，正建立在盐运之上。",
+    "kind": "史实",
+    "source": "《扬州画舫录·卷九》",
+}
+
+
+class TestValidateTale:
+
+    def test_valid(self):
+        t = _validate_tale(dict(MOCK_TALE_RESPONSE))
+        assert t["pivot_type"] == "地域"
+        assert t["kind"] == "史实"
+        assert t["title"] == "程氏义仓"
+
+    def test_empty_tale_invalid(self):
+        assert _validate_tale(dict(MOCK_TALE_RESPONSE, tale="  ")) is None
+        assert _validate_tale({}) is None
+
+    def test_bad_pivot_type_falls_back(self):
+        t = _validate_tale(dict(MOCK_TALE_RESPONSE, pivot_type="职业"))
+        assert t["pivot_type"] == "风俗"
+        assert t["pivot_type"] in PIVOT_TYPES
+
+    def test_fact_without_source_downgraded(self):
+        t = _validate_tale(dict(MOCK_TALE_RESPONSE, source=""))
+        assert t["kind"] == "存疑"
+
+    def test_non_string_fields_tolerated(self):
+        t = _validate_tale(dict(MOCK_TALE_RESPONSE, pivot=None, title=3, connection=[]))
+        assert t["pivot"] == "" and t["title"] == "" and t["connection"] == ""
+
+
+class TestCoveredPoints:
+
+    def test_none_story(self):
+        assert _covered_points(None) == "（无）"
+
+    def test_lists_items_with_labels(self):
+        story = _validate_and_normalize(json.loads(json.dumps(MOCK_STORY_RESPONSE)))
+        text = _covered_points(story)
+        assert "[作者轶事]" in text
+        assert "苏轼与苏辙兄弟情深" in text
+
+    def test_all_empty_sections(self):
+        story = {"summary": "x", "sections": {k: [] for k in SECTION_LABELS}}
+        assert _covered_points(story) == "（无）"
+
+
+class TestGetTale:
+
+    @pytest.mark.asyncio
+    async def test_no_api_key(self, sample_poem):
+        assert await get_tale(sample_poem, None, []) is None
+
+    @pytest.mark.asyncio
+    async def test_success_and_prompt_contents(self, monkeypatch, sample_poem):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        mock_create = AsyncMock(return_value=_mock_llm_response(MOCK_TALE_RESPONSE))
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = mock_create
+        story = _validate_and_normalize(json.loads(json.dumps(MOCK_STORY_RESPONSE)))
+
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            tale = await get_tale(sample_poem, story, ["地域", "时节"])
+
+        assert tale["pivot"] == "扬州盐商"
+        user_msg = mock_create.call_args.kwargs["messages"][1]["content"]
+        assert "水调歌头" in user_msg
+        assert "[作者轶事]" in user_msg           # 已覆盖要点被喂入
+        assert "地域、时节" in user_msg            # 近期类型被喂入
+
+    @pytest.mark.asyncio
+    async def test_llm_error(self, monkeypatch, sample_poem):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(side_effect=Exception("boom"))
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
+            assert await get_tale(sample_poem, None, []) is None
+
+
+class TestPivotHistory:
+
+    def test_record_and_recent(self, sample_poem):
+        from src.poetry import detector as det
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        poem = dict(sample_poem, date=today)
+        det._save_to_history(poem)
+        det.record_pivot_type(poem, "地域")
+        assert det.recent_pivot_types() == ["地域"]
+
+    def test_record_unknown_poem_is_noop(self, sample_poem):
+        from src.poetry import detector as det
+        det.record_pivot_type(sample_poem, "地域")
+        assert not det._HISTORY_PATH.exists()
+
+    def test_recent_dedup_and_window(self, sample_poem):
+        from src.poetry import detector as det
+        from datetime import datetime, timedelta
+        d0 = datetime.now()
+        for delta, pt in [(0, "地域"), (1, "时节"), (2, "地域"), (10, "朝代")]:
+            p = dict(sample_poem, title=f"t{delta}", date=(d0 - timedelta(days=delta)).strftime("%Y-%m-%d"))
+            det._save_to_history(p)
+            det.record_pivot_type(p, pt)
+        assert set(det.recent_pivot_types()) == {"地域", "时节"}   # 10 天前的不算
+        assert len(det.recent_pivot_types()) == 2                # 去重

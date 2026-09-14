@@ -47,6 +47,31 @@ def _save_to_history(poem: dict) -> None:
     )
 
 
+def record_pivot_type(poem: dict, pivot_type: str) -> None:
+    """把衍生故事的类型写回当天该诗的历史记录，供后续运行避开近期用过的类型。"""
+    history = _load_history(days=_HISTORY_DAYS)
+    for r in reversed(history):
+        if r.get("title") == poem.get("title") and r.get("date") == poem.get("date"):
+            r["pivot_type"] = pivot_type
+            break
+    else:
+        return
+    _HISTORY_PATH.write_text(
+        json.dumps(history, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def recent_pivot_types(days: int = 7) -> list[str]:
+    """近 N 天用过的衍生类型（去重、按时间先后）。"""
+    seen: list[str] = []
+    for r in _load_history(days=days):
+        pt = r.get("pivot_type")
+        if pt and pt not in seen:
+            seen.append(pt)
+    return seen
+
+
 def _format_exclusion_block(history: list[dict]) -> str:
     """将历史记录格式化为注入 system prompt 的强制排除块。"""
     if not history:

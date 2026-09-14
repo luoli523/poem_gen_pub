@@ -27,8 +27,8 @@ from src.solar_term.content import (
 )
 
 # ── 诗词模块 ──
-from src.poetry.detector import get_poem, get_poem_by_name
-from src.poetry.story import get_story
+from src.poetry.detector import get_poem, get_poem_by_name, record_pivot_type, recent_pivot_types
+from src.poetry.story import get_story, get_tale
 from src.poetry.content import (
     generate_markdown as poetry_generate_markdown,
     build_ig_caption as poetry_build_ig_caption,
@@ -169,9 +169,17 @@ async def _write_poem_site_page(poem: dict, site_dir: Path) -> None:
     else:
         print("  ⚠ 故事生成失败，内容页将不含故事")
 
+    print("📚 正在生成衍生一则...")
+    tale = await get_tale(poem, story, recent_pivot_types())
+    if tale:
+        print(f"  ✅ 衍生一则：《{tale['title']}》—— 自「{tale['pivot']}」（{tale['pivot_type']}）衍生")
+        record_pivot_type(poem, tale["pivot_type"])
+    else:
+        print("  ⚠ 衍生故事生成失败，内容页将不含此节")
+
     page_file = site_dir / poetry_site_page_filename(poem)
     page_file.parent.mkdir(parents=True, exist_ok=True)
-    page_file.write_text(poetry_generate_site_page(poem, story), encoding="utf-8")
+    page_file.write_text(poetry_generate_site_page(poem, story, tale), encoding="utf-8")
     print(f"  📄 站点内容页: {page_file}")
 
 

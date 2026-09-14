@@ -165,3 +165,150 @@ async def get_story(poem: dict) -> dict | None:
     except Exception as e:
         print(f"  ⚠ 故事生成出错: {type(e).__name__}: {e}")
         return None
+
+
+# ── 衍生一则：从诗中任一点跳出去的叙事性民间故事 / 方志记载 ──
+
+PIVOT_TYPES = ("地域", "时节", "朝代", "民族", "风俗", "名物")
+
+TALE_SYSTEM_PROMPT = """\
+你是一位熟读地方志、笔记小说与民间故事集的文化史学者，正在为一位写作者搜集素材。
+给定一首诗词，以及围绕它已经整理过的考据要点，请从诗中**任意一个点**跳出去——
+一个地名、一个节令、一个朝代、一个民族、一种风俗、一件器物——找到一则有记载或有流传的
+故事，讲给写作者听。
+
+素材来源，按优先级：
+1. 地方志：府志、州志、县志、乡土志中的人物传、杂记、祥异、风俗、古迹条目，
+   以及《扬州画舫录》《武林旧事》《梦粱录》《帝京景物略》《清嘉录》《岭外代答》这类地域笔记
+2. 笔记小说与志怪：《太平广记》《夷坚志》《酉阳杂俎》《搜神记》《子不语》《阅微草堂笔记》等
+3. 民间故事集、戏曲话本、地方口传（须注明流传地域）
+
+取材要求：
+1. 必须是真有记载或真有流传的，不得凭空编造；给不出来源就标"存疑"，不得虚构书名篇卷
+2. 有活人：具名或有明确身份的人物，具体的年代、地点、一段具体的经历，有情节转折
+   拒绝"古人常常……""当地流行……"这类泛写
+3. 追求意外：避开最顺手的联想。已整理过的要点会随题给出，请不要重复它们，
+   从别的点衍生；也请尽量避开近期已用过的衍生类型
+4. 凡适合做写作题材的都可以：奇人、冤案、异事、一桩买卖、一场迁徙、一个手艺、
+   一次水旱、一段婚姻、一件器物的来历——不限于"传说"
+
+写法要求：
+- 叙事口吻，400-800 字，可有对话与细节，像讲给朋友听
+- 不美化、不煽情、不下道德评语；把细节留给读者
+- connection 用一两句说清它与这首诗的关联点，不必牵强
+
+你必须以严格的 JSON 格式返回，schema 如下：
+{
+  "pivot": string,        // 衍生点，如"扬州盐商"、"寒食禁火"、"契丹捺钵"
+  "pivot_type": string,   // 只能取："地域"、"时节"、"朝代"、"民族"、"风俗"、"名物"
+  "title": string,        // 故事标题，8 字以内
+  "tale": string,         // 400-800 字叙事正文
+  "connection": string,   // 与本诗的关联，1-2 句
+  "kind": string,         // 只能取："史实"、"传说"、"附会"、"存疑"
+  "source": string        // 《书名·篇卷》，或"流传于××一带"
+}"""
+
+TALE_USER_TEMPLATE = """\
+诗词：《{title}》（{dynasty}·{author}）
+场景：{occasion}
+
+全文：
+{full_text}
+
+已整理过的考据要点（请避开，从别处衍生）：
+{covered}
+
+近期已用过的衍生类型（请尽量避开）：{recent_pivot_types}
+
+请讲一则衍生出来的故事。"""
+
+
+def _validate_tale(data: dict) -> dict | None:
+    """校验衍生故事。tale 正文为空即无效；pivot_type / kind 非法则归为兜底值。"""
+    tale = data.get("tale")
+    if not isinstance(tale, str) or not tale.strip():
+        print("  ⚠ LLM 返回的衍生故事正文为空")
+        return None
+
+    def _str(key: str) -> str:
+        v = data.get(key)
+        return v.strip() if isinstance(v, str) else ""
+
+    pivot_type = _str("pivot_type")
+    if pivot_type not in PIVOT_TYPES:
+        pivot_type = "风俗"
+
+    kind = _str("kind")
+    if kind not in KINDS:
+        kind = _DEFAULT_KIND
+    source = _str("source")
+    if kind == "史实" and not source:
+        kind = _DEFAULT_KIND
+
+    return {
+        "pivot": _str("pivot"),
+        "pivot_type": pivot_type,
+        "title": _str("title"),
+        "tale": tale.strip(),
+        "connection": _str("connection"),
+        "kind": kind,
+        "source": source,
+    }
+
+
+def _covered_points(story: dict | None) -> str:
+    """把六类素材压成一行一条的要点清单，供衍生故事避开。"""
+    if not story:
+        return "（无）"
+    lines = []
+    for key, items in story.get("sections", {}).items():
+        for item in items:
+            lines.append(f"- [{SECTION_LABELS[key]}] {item['text'][:60]}")
+    return "\n".join(lines) or "（无）"
+
+
+async def get_tale(poem: dict, story: dict | None, recent_pivot_types: list[str]) -> dict | None:
+    """调用 LLM 生成一则衍生故事。失败返回 None，不影响主流程。"""
+    from src.common.config import get_llm_config
+    llm = get_llm_config()
+    if not llm["api_key"]:
+        return None
+
+    try:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=llm["api_key"], base_url=llm.get("base_url"))
+        response = await client.chat.completions.create(
+            model=llm["model"],
+            messages=[
+                {"role": "system", "content": TALE_SYSTEM_PROMPT},
+                {"role": "user", "content": TALE_USER_TEMPLATE.format(
+                    title=poem.get("title", ""),
+                    author=poem.get("author", ""),
+                    dynasty=poem.get("dynasty", ""),
+                    occasion=poem.get("occasion", ""),
+                    full_text=poem.get("full_text", ""),
+                    covered=_covered_points(story),
+                    recent_pivot_types="、".join(recent_pivot_types) or "（无）",
+                )},
+            ],
+            response_format={"type": "json_object"},
+            max_completion_tokens=llm["max_completion_tokens"],
+        )
+
+        content = response.choices[0].message.content
+        if not content:
+            print("  ⚠ LLM 衍生故事返回为空")
+            return None
+
+        return _validate_tale(json.loads(content))
+
+    except ImportError:
+        print("  ⚠ openai 库未安装，无法生成衍生故事")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"  ⚠ 衍生故事 JSON 解析失败: {e}")
+        return None
+    except Exception as e:
+        print(f"  ⚠ 衍生故事生成出错: {type(e).__name__}: {e}")
+        return None

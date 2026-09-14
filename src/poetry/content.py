@@ -122,10 +122,10 @@ def site_page_filename(poem: dict) -> str:
     return f"{poem.get('date', '')}-{title}.md"
 
 
-def generate_site_page(poem: dict, story: dict | None) -> str:
-    """生成 Hugo 内容页：frontmatter（分类索引用）+ 诗 + 赏析 + 背后的故事。
+def generate_site_page(poem: dict, story: dict | None, tale: dict | None = None) -> str:
+    """生成 Hugo 内容页：frontmatter（分类索引用）+ 诗 + 赏析 + 背后的故事 + 衍生一则。
 
-    story 为 None 时仍生成页面，故事部分留待以后用 --poem 回补。
+    story / tale 为 None 时仍生成页面，缺的部分留待以后用 --poem 回补。
     """
     sections = (story or {}).get("sections", {})
     summary = (story or {}).get("summary", "")
@@ -144,6 +144,8 @@ def generate_site_page(poem: dict, story: dict | None) -> str:
         "occasions": [poem["occasion"]] if poem.get("occasion") else [],
         "categories": present_categories,
         "kinds": present_kinds,
+        "pivot_types": [tale["pivot_type"]] if tale else [],
+        "tale_title": tale["title"] if tale else "",
         "summary": summary,
     }
     front_text = yaml.safe_dump(front, allow_unicode=True, sort_keys=False).rstrip()
@@ -184,5 +186,20 @@ def generate_site_page(poem: dict, story: dict | None) -> str:
                 tag += "〕"
                 body.append(f"- {item['text']} {tag}")
             body.append("")
+
+    if tale:
+        heading = "## 衍生一则"
+        if tale["title"]:
+            heading += f"：{tale['title']}"
+        body += [heading, ""]
+        if tale["pivot"]:
+            body += [f"_衍生自：{tale['pivot']}（{tale['pivot_type']}）_", ""]
+        body += [tale["tale"], ""]
+        if tale["connection"]:
+            body += [f"**与本诗的关联**：{tale['connection']}", ""]
+        tag = f"〔{tale['kind']}"
+        if tale["source"]:
+            tag += f" · {tale['source']}"
+        body.append(tag + "〕")
 
     return "\n".join(body).rstrip() + "\n"

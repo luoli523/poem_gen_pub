@@ -134,3 +134,30 @@ class TestPoetrySitePage:
         assert front["kinds"] == []
         assert front["summary"] == ""
         assert "暂未生成" in body
+
+    def test_page_with_tale(self, sample_poem, sample_story):
+        import yaml
+        from src.poetry.content import generate_site_page
+        tale = {
+            "pivot": "扬州盐商", "pivot_type": "地域", "title": "程氏义仓",
+            "tale": "乾隆年间，扬州盐商程某……", "connection": "扬州繁华建立在盐运之上。",
+            "kind": "史实", "source": "《扬州画舫录·卷九》",
+        }
+        page = generate_site_page(sample_poem, sample_story, tale)
+        _, front_text, body = page.split("---\n", 2)
+        front = yaml.safe_load(front_text)
+        assert front["pivot_types"] == ["地域"]
+        assert front["tale_title"] == "程氏义仓"
+        assert "## 衍生一则：程氏义仓" in body
+        assert "_衍生自：扬州盐商（地域）_" in body
+        assert "乾隆年间" in body
+        assert "**与本诗的关联**：扬州繁华" in body
+        assert body.rstrip().endswith("〔史实 · 《扬州画舫录·卷九》〕")
+
+    def test_page_without_tale_has_no_section(self, sample_poem, sample_story):
+        import yaml
+        from src.poetry.content import generate_site_page
+        page = generate_site_page(sample_poem, sample_story, None)
+        _, front_text, body = page.split("---\n", 2)
+        assert yaml.safe_load(front_text)["pivot_types"] == []
+        assert "衍生一则" not in body
