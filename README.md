@@ -39,7 +39,8 @@ hugo --source site server            # 搜索页需先 hugo 构建后执行 npx 
 ### 1. 安装依赖
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt        # 本地开发
+# CI 使用 requirements.lock（精确版本），升级依赖后请重新生成，见文件头注释
 ```
 
 ### 2. 配置环境变量
