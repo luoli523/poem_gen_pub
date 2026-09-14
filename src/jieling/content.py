@@ -15,6 +15,12 @@ def page_dir(site_dir: Path, item: dict) -> Path:
     return site_dir / item["name"] / item["date"][:4]
 
 
+def page_url(base_url: str, item: dict) -> str:
+    """节令档案页 URL：terms/<节令名>/<年>/。"""
+    from urllib.parse import quote
+    return f"{base_url.rstrip('/')}/terms/{quote(item['name'])}/{item['date'][:4]}/"
+
+
 def load_previous_stories(site_dir: Path, item: dict) -> list[dict]:
     """读同名节令往年（不含今年）的 story.json，供生成时排除。"""
     root = site_dir / item["name"]

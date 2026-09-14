@@ -76,6 +76,9 @@ class TestContent:
         assert [p["year"] for p in prev] == ["2025"]
         assert prev[0]["sections"]["origin"][0]["source"] == "《月令七十二候集解》"
 
+    def test_page_url(self, bailu):
+        assert jc.page_url("https://x.io/p/", bailu) == "https://x.io/p/terms/%E7%99%BD%E9%9C%B2/2026/"
+
     def test_previous_missing_dir(self, tmp_path, bailu):
         assert jc.load_previous_stories(tmp_path, bailu) == []
 

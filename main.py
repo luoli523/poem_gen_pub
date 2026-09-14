@@ -14,7 +14,7 @@ import yaml
 from dotenv import load_dotenv
 
 # ── 共享模块 ──
-from src.common.telegram import send_photo as telegram_send_photo, send_message as telegram_send_message, get_telegram_config
+from src.common.telegram import send_message as telegram_send_message, get_telegram_config
 from src.common.instagram import get_ig_config, publish_album as ig_publish_album
 from src.common.notebooklm import check_auth as check_nlm_auth, run_pipeline as nlm_run_pipeline
 from src.common.constants import beijing_today
@@ -32,6 +32,7 @@ from src.poetry.content import (
     build_ig_caption as poetry_build_ig_caption,
     generate_site_page as poetry_generate_site_page,
     site_page_dir as poetry_site_page_dir,
+    page_url as poetry_page_url,
     save_infographic_webp,
     INFOGRAPHIC_FILENAME,
 )
@@ -131,22 +132,7 @@ async def _run_content_pipeline(
 
     print(f"  🎨 {label}图片: {image}")
 
-    # 3. Telegram 发送图片 + 完整文案
-    tg_config = get_telegram_config()
-    if tg_config:
-        bot_token, chat_id = tg_config
-        print(f"  📱 推送{label}图片到 Telegram...")
-        ok = await telegram_send_photo(bot_token, chat_id, image, caption="")
-        if ok:
-            full_caption = build_caption_fn(data)
-            await telegram_send_message(bot_token, chat_id, full_caption, parse_mode="")
-            print(f"  ✅ {label}图片及完整文案已推送到 Telegram")
-        else:
-            print(f"  ⚠ {label}图片 Telegram 推送失败")
-    else:
-        print(f"  ⏭ Telegram 未配置，跳过{label}推送")
-
-    # 4. Instagram 发布帖子
+    # 3. Instagram 发布帖子（Telegram 只发页面链接，见 _notify_page）
     if skip_ig:
         print("  ⏭ 跳过 Instagram（--no-ig）")
     else:
@@ -167,6 +153,20 @@ async def _run_content_pipeline(
             print(f"  ⏭ Instagram 未配置，跳过{label}发布")
 
     return image
+
+
+# ── Telegram：只发页面链接 ──
+
+
+async def _notify_page(text: str) -> None:
+    """向 Telegram 发一条带站内链接的短消息（HTML）。未配置则跳过。"""
+    tg_config = get_telegram_config()
+    if not tg_config:
+        print("  ⏭ Telegram 未配置，跳过链接推送")
+        return
+    bot_token, chat_id = tg_config
+    if await telegram_send_message(bot_token, chat_id, text):
+        print("  📱 页面链接已推送到 Telegram")
 
 
 # ── 诗词：故事 + 站点内容页 + 信息图 ──
@@ -215,7 +215,7 @@ def _write_poem_page(
 async def _run_poem_flow(
     poem: dict, name_key: str, today: str, output_dir: Path, site_dir: Path,
     skip_notebooklm: bool, skip_ig: bool, tale_enabled: bool, ratio: str,
-    problems: list[str], jieling: list[str] | None = None,
+    problems: list[str], jieling: list[str] | None = None, base_url: str = "",
 ) -> None:
     """诗词完整流程：故事 → 先落一版无图页面 → 信息图/推送 → 图转 WebP 存入页面目录并重写页面。
 
@@ -247,6 +247,14 @@ async def _run_poem_flow(
     elif not skip_notebooklm:
         problems.append(f"《{poem['title']}》信息图未生成（NotebookLM 失败），页面无图")
 
+    if base_url and not skip_notebooklm:   # dry_run 不推送
+        summary = (story or {}).get("summary", "")
+        await _notify_page(
+            f"📜 <b>{poem['title']}</b>　{poem['dynasty']}·{poem['author']}\n"
+            + (f"{summary}\n" if summary else "")
+            + f"<a href=\"{poetry_page_url(base_url, poem)}\">读这首的背后 →</a>"
+        )
+
 
 NLM_AUTH_HINT = (
     "检查 secret NOTEBOOKLM_MASTER_TOKEN；若 master token 已被吊销，本地重新执行 "
@@ -275,7 +283,7 @@ async def _report_problems(today: str, problems: list[str]) -> None:
 
 async def _run_jieling_flow(
     item: dict, today: str, output_dir: Path, terms_dir: Path,
-    skip_notebooklm: bool, skip_ig: bool, ratio: str, problems: list[str],
+    skip_notebooklm: bool, skip_ig: bool, ratio: str, problems: list[str], base_url: str = "",
 ) -> None:
     """一个节令的完整流程：读往年 → 生成素材 → 先落页面 + story.json → 信息图/推送 → 补图。
 
@@ -318,6 +326,14 @@ async def _run_jieling_flow(
     elif not skip_notebooklm:
         problems.append(f"节令「{item['name']}」信息图未生成（NotebookLM 失败），页面无图")
 
+    if base_url and not skip_notebooklm:
+        who = item["category"] if not item.get("ethnic") else f"{item['ethnic']}·{item['category']}"
+        await _notify_page(
+            f"🌿 <b>{item['name']}</b>　{who}\n"
+            + (f"{story['summary']}\n" if story.get("summary") else "")
+            + f"<a href=\"{jieling_content.page_url(base_url, item)}\">读这个节令的档案 →</a>"
+        )
+
 
 # ── 主流程 ──
 
@@ -355,6 +371,7 @@ async def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     site_dir = Path(config["site"]["content_dir"])
     terms_dir = Path(config["site"]["terms_dir"])
+    base_url = config["site"].get("base_url", "")
     tale_enabled = bool(config.get("tale", {}).get("enabled", False))
 
     # 降级项：任一环节失败都记在这里，结尾统一汇报并把 run 标红
@@ -381,6 +398,7 @@ async def main():
             await _run_jieling_flow(
                 item, today=today, output_dir=output_dir, terms_dir=terms_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, ratio=args.ratio, problems=problems,
+                base_url=base_url,
             )
     else:
         print(f"\n🌿 今日无节令")
@@ -400,7 +418,7 @@ async def main():
             await _run_poem_flow(
                 poem, name_key=poem["title"], today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
-                ratio=args.ratio, problems=problems, jieling=jieling_names,
+                ratio=args.ratio, problems=problems, jieling=jieling_names, base_url=base_url,
             )
         else:
             print(f"📜 诗词「{args.poem}」获取失败，跳过")
@@ -414,7 +432,7 @@ async def main():
             await _run_poem_flow(
                 poem, name_key=occasion, today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
-                ratio=args.ratio, problems=problems, jieling=jieling_names,
+                ratio=args.ratio, problems=problems, jieling=jieling_names, base_url=base_url,
             )
         else:
             print(f"📜 诗词获取失败，跳过")

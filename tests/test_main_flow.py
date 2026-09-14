@@ -60,7 +60,7 @@ class TestPoemFlowProblems:
     async def test_story_failure_recorded_page_still_written(self, tmp_path, sample_poem):
         problems = await self._run(tmp_path, sample_poem, None, "img.png")
         assert len(problems) == 1 and "背后的故事生成失败" in problems[0]
-        assert (tmp_path / "site" / "2026-10-04-水调歌头·明月几时有" / "index.md").exists()
+        assert (tmp_path / "site" / "2026-10-04-水调歌头明月几时有" / "index.md").exists()
 
     @pytest.mark.asyncio
     async def test_image_failure_recorded(self, tmp_path, sample_poem):
@@ -71,6 +71,54 @@ class TestPoemFlowProblems:
     async def test_image_skipped_not_a_problem(self, tmp_path, sample_poem):
         problems = await self._run(tmp_path, sample_poem, {"summary": "s", "sections": {}}, None, skip_nlm=True)
         assert problems == []
+
+
+class TestPageNotification:
+
+    async def _poem(self, tmp_path, sample_poem, base_url, skip_nlm):
+        story = {"summary": "引子", "sections": {}}
+        with patch.object(main, "_build_poem_story", AsyncMock(return_value=(story, None))), \
+             patch.object(main, "_run_content_pipeline", AsyncMock(return_value=None)), \
+             patch.object(main, "_notify_page", AsyncMock()) as notify:
+            await main._run_poem_flow(
+                sample_poem, name_key="k", today=sample_poem["date"], output_dir=tmp_path / "o",
+                site_dir=tmp_path / "s", skip_notebooklm=skip_nlm, skip_ig=True, tale_enabled=False,
+                ratio="4:5", problems=[], base_url=base_url,
+            )
+        return notify
+
+    @pytest.mark.asyncio
+    async def test_poem_link_sent(self, tmp_path, sample_poem):
+        notify = await self._poem(tmp_path, sample_poem, "https://x.io/p/", skip_nlm=False)
+        notify.assert_called_once()
+        text = notify.call_args.args[0]
+        assert "<b>水调歌头·明月几时有</b>" in text and "宋·苏轼" in text and "引子" in text
+        assert 'href="https://x.io/p/poems/2026-10-04-' in text
+
+    @pytest.mark.asyncio
+    async def test_dry_run_sends_nothing(self, tmp_path, sample_poem):
+        notify = await self._poem(tmp_path, sample_poem, "https://x.io/p/", skip_nlm=True)
+        notify.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_base_url_sends_nothing(self, tmp_path, sample_poem):
+        notify = await self._poem(tmp_path, sample_poem, "", skip_nlm=False)
+        notify.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_jieling_link_sent(self, tmp_path):
+        item = {"name": "白露", "category": "节气", "ethnic": "", "date": "2026-09-07", "season": "秋", "lunar": ""}
+        story = {"summary": "s", "infographic_prompt": "p",
+                 "sections": {"origin": [{"text": "t", "kind": "史实", "source": "《x》"}], "customs": [],
+                              "food_objects": [], "in_poetry": [], "figures_legends": [], "gazetteers": []}}
+        with patch.object(main, "get_jieling_story", AsyncMock(return_value=story)), \
+             patch.object(main, "_run_content_pipeline", AsyncMock(return_value=None)), \
+             patch.object(main, "_notify_page", AsyncMock()) as notify:
+            await main._run_jieling_flow(item, today=item["date"], output_dir=tmp_path / "o",
+                                         terms_dir=tmp_path / "t", skip_notebooklm=False, skip_ig=True,
+                                         ratio="4:5", problems=[], base_url="https://x.io/p/")
+        text = notify.call_args.args[0]
+        assert "<b>白露</b>" in text and 'href="https://x.io/p/terms/%E7%99%BD%E9%9C%B2/2026/"' in text
 
 
 class TestReportProblems:

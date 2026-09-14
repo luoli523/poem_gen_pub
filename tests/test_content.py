@@ -63,8 +63,13 @@ class TestPoetrySitePage:
 
     def test_dir_strips_unsafe_chars(self, sample_poem):
         from src.poetry.content import site_page_dir
-        poem = dict(sample_poem, title="水调歌头·明月几时有 / 试:题?")
-        assert site_page_dir(poem) == "2026-10-04-水调歌头·明月几时有试题"
+        poem = dict(sample_poem, title="水调歌头·明月几时有 / 试:题？（甲）")
+        assert site_page_dir(poem) == "2026-10-04-水调歌头明月几时有试题甲"   # · 与中文标点一并去掉，与 Hugo URL 一致
+
+    def test_page_url(self, sample_poem):
+        from src.poetry.content import page_url
+        url = page_url("https://x.io/poem_gen_pub/", dict(sample_poem, title="饮酒·其五"))
+        assert url == "https://x.io/poem_gen_pub/poems/2026-10-04-%E9%A5%AE%E9%85%92%E5%85%B6%E4%BA%94/"
 
     def test_dir_empty_title(self, sample_poem):
         from src.poetry.content import site_page_dir

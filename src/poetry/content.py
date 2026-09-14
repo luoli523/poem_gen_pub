@@ -113,7 +113,9 @@ def build_telegram_caption(poem: dict) -> str:
 
 # ── 站点内容页（Hugo）──
 
-_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\s]+')
+# 文件名非法字符 + Hugo URLize 会丢弃的标点（· ， 。 ？ ！ 、 ： ； 括号 书名号），
+# 让目录名与最终 URL 一致，Telegram 里的链接才能直接拼出来
+_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\s·，。？！、：；「」『』《》〈〉（）()]+')
 
 
 INFOGRAPHIC_FILENAME = "infographic.webp"
@@ -125,6 +127,12 @@ def site_page_dir(poem: dict) -> str:
     页面写为 <dir>/index.md，信息图与之同目录。"""
     title = _UNSAFE_FILENAME_CHARS.sub("", poem.get("title", "")) or "untitled"
     return f"{poem.get('date', '')}-{title}"
+
+
+def page_url(base_url: str, poem: dict) -> str:
+    """诗词页在站点上的 URL（目录名已 URL 安全，只需百分号编码中文）。"""
+    from urllib.parse import quote
+    return f"{base_url.rstrip('/')}/poems/{quote(site_page_dir(poem))}/"
 
 
 def save_infographic_webp(src_image: str, dst_path: Path) -> Path:

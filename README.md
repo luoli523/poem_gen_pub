@@ -9,7 +9,7 @@
 - **节气检测**：自动识别二十四节气及传统节日（七夕、重阳等）
 - **诗词匹配**：调用 LLM 动态匹配当日最应景的古诗词
 - **Infographic 生成**：通过 NotebookLM 将内容渲染为精美图片
-- **多平台发布**：自动推送到 Telegram、Instagram
+- **多平台发布**：Telegram 推送页面链接（标题 + 引子），Instagram 发布信息图
 - **背后的故事**：第二次 LLM 调用整理作者轶事、本事、时代背景、风土人情、传说、典故六类素材，每条标注可信度与出处，写入 `site/content/poems/` 并提交回仓库持续积累
 - **每日自动运行**：GitHub Actions 每天北京时间 7:00 执行
 - **多 LLM 支持**：Grok、ChatGPT、DeepSeek 等 OpenAI 兼容服务均可使用

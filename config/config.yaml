@@ -12,6 +12,7 @@ output:
 
 # 站点内容（Hugo 内容页，每日诗词 + 背后的故事，提交回 repo 持续积累）
 site:
+  base_url: "https://luoli523.github.io/poem_gen_pub/"   # Telegram 推送里的页面链接前缀
   content_dir: "./site/content/poems"
   terms_dir: "./site/content/terms"      # 节令档案：terms/<节令名>/<年>/
 

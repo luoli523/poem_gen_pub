@@ -39,8 +39,8 @@ flowchart TD
         STORY -- 失败 --> P3[/记入 problems/] --> PAGE1
         STORY -- 成功 --> PAGE1[先落页面 ⟨日期-诗题⟩/index.md<br/><b>无图</b>]
         PAGE1 --> PIPE2[通用管线 ▶]
-        PIPE2 -- 有图 --> WEBP[PNG → WebP q85<br/>存入同目录] --> PAGE2[重写页面，加图] --> END
-        PIPE2 -- 无图 --> P4[/记入 problems/] --> END
+        PIPE2 -- 有图 --> WEBP[PNG → WebP q85<br/>存入同目录] --> PAGE2[重写页面，加图] --> TGL[Telegram：标题 + 引子 + 页面链接] --> END
+        PIPE2 -- 无图 --> P4[/记入 problems/] --> TGL
 
         END{problems 为空?}
         END -- 是 --> OK[✅ exit 0]
@@ -53,7 +53,7 @@ flowchart TD
         SKIP -- 是 --> RN[返回 None]
         SKIP -- 否 --> NLM[NotebookLM<br/>找/建 notebook → 上传 source<br/>→ 建 infographic（重试 3 次）<br/>→ 等待 ≤300s → 下载 PNG]
         NLM -- 异常/失败 --> RN
-        NLM -- 成功 --> TG[Telegram：图 + 全文案] --> IG[Instagram：图 + 文案<br/><i>IG_ENABLED 时</i>] --> RI[返回图片路径]
+        NLM -- 成功 --> IG[Instagram：图 + 文案<br/><i>IG_ENABLED 时</i>] --> RI[返回图片路径]
     end
 
     OK --> COMMIT
@@ -144,9 +144,10 @@ flowchart TD
 
 1. 生成 NotebookLM 用的 Markdown 到 `output/`，prompt 另存 `.prompt.txt`
 2. NotebookLM：查找/创建 notebook → 上传 Markdown 为 source → 创建 infographic（最多 3 次重试，退避 10s/20s）→ 等待完成（超时 300s）→ 重命名 artifact → 下载 PNG。整段 try/except：任何异常 → 返回 None
-3. Telegram：先发图，再发完整文案
-4. Instagram：`IG_ENABLED` 时以图 + 文案发帖
-5. 返回图片路径
+3. Instagram：`IG_ENABLED` 时以图 + 文案发帖
+4. 返回图片路径
+
+Telegram 不再发图：诗词 / 节令页面最终写好后（有图无图皆可），各发一条「标题 + 引子 + 站内链接」的短消息（dry_run 不发）。
 
 ### 5. 收尾
 
@@ -164,7 +165,7 @@ flowchart TD
 
 - **git**：诗词 bundle（`index.md` + `infographic.webp`）+ `poem_history.json` 一条记录；节令日另加 `terms/<名>/<年>/`（`index.md` + `story.json` + 图）
 - **站点**：新诗页 + 六个索引维度自动更新 + 搜索索引
-- **Telegram**：节令图文（如有）+ 诗词图文；有降级则再加一条汇总
+- **Telegram**：节令链接（如有）+ 诗词链接，各一条短消息；有降级则再加一条汇总
 - **Instagram**：同上图文（若启用）
 - **Actions**：绿 = 完整一天；红 = 有降级，Telegram 里有原因
 
@@ -178,7 +179,7 @@ flowchart TD
 | 取诗 | 当天无诗词页；TG 汇总；红 |
 | 故事 | 有诗页无故事节；TG 汇总；红 |
 | NLM 生成 / 超时 / 异常 | 页面无图；TG 汇总；红 |
-| Telegram / IG 发送 | 只打日志，不计入降级 |
+| Telegram 链接 / IG 发送 | 只打日志，不计入降级 |
 | LLM key 缺失 | TG 通知；红 |
 
 ## 六、维护操作
