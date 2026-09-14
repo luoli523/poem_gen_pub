@@ -166,9 +166,11 @@ dialog.zoom p { position: fixed; bottom: .8rem; left: 0; right: 0; text-align: c
 }
 
 /* ── 节令目录：缩略图 ｜ 类别 ｜ 名 ｜ 年份 ｜ 农历/季 ── */
-.catalog.terms-catalog li { grid-template-columns: 3rem 6.5em minmax(0, 1fr) 12em 9em; }
-.catalog .years a { margin-right: .8em; font-variant-numeric: tabular-nums; }
+.catalog.terms-catalog li { grid-template-columns: 3rem 6.5em minmax(0, 1fr) 9em 10em; }   /* 与诗词行同栏宽 */
+.catalog .t-wrap { min-width: 0; }
+.catalog .years { margin-left: 1em; font-size: .85rem; color: var(--ink-2); }
+.catalog .years a { margin-right: .6em; font-variant-numeric: tabular-nums; }
 @media (max-width: 60rem) {
   .catalog.terms-catalog li { grid-template-columns: 3rem 6.5em minmax(0, 1fr); }
-  .catalog.terms-catalog .years, .catalog.terms-catalog .occ { grid-column: 3; border-left: 0; padding-top: .1em; font-size: .9rem; }
+  .catalog.terms-catalog .who, .catalog.terms-catalog .occ { grid-column: 3; border-left: 0; padding-top: .1em; font-size: .9rem; }
 }
