@@ -14,3 +14,7 @@
 <link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}">
 {{ end }}
 {{ with .Params.infographic }}{{ with $.Resources.Get . }}<meta property="og:image" content="{{ .Permalink }}">{{ end }}{{ end }}
+{{/* 访问统计：本地 hugo server 预览时不注入，避免污染数据 */}}
+{{ if not hugo.IsServer }}{{ with site.Params.analytics.cloudflare.token }}
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "{{ . }}"}'></script>
+{{ end }}{{ end }}
