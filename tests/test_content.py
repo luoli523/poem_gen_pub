@@ -163,3 +163,28 @@ class TestPoetrySitePage:
         _, front_text, body = page.split("---\n", 2)
         assert yaml.safe_load(front_text)["pivot_types"] == []
         assert "衍生一则" not in body
+
+
+class TestComposedDisplay:
+
+    def test_exact(self):
+        from src.poetry.content import composed_lines
+        assert composed_lines({"era": "唐 开元十五年", "year": 727, "certainty": "确切", "note": ""}) == \
+            ["唐 开元十五年", "公元 727 年", "丁卯年（兔）"]
+
+    def test_approx_and_bc(self):
+        from src.poetry.content import composed_lines
+        assert composed_lines({"era": "秦", "year": -221, "certainty": "约", "note": ""}) == \
+            ["约 秦", "约 公元前 221 年", "庚辰年（龙）"]
+
+    def test_unknown(self):
+        from src.poetry.content import composed_lines
+        assert composed_lines({"era": "唐", "year": None, "certainty": "不详", "note": "x"}) == ["唐", "作年不详"]
+        assert composed_lines(None) == []
+
+    def test_frontmatter_fields(self, sample_poem):
+        import yaml
+        from src.poetry.content import generate_site_page
+        story = {"summary": "s", "sections": {}, "composed": {"era": "宋 元丰五年", "year": 1082, "certainty": "确切", "note": "n"}}
+        front = yaml.safe_load(generate_site_page(sample_poem, story).split("---\n", 2)[1])
+        assert front["composed_year"] == 1082 and front["composed_lines"][2] == "壬戌年（狗）"

@@ -46,10 +46,16 @@ SYSTEM_PROMPT = """\
    source 统一写作《书名·篇卷》格式，如《旧唐书·杜牧传》《东京梦华录·卷八》
 4. 文字面向有文学素养的读者，具体、有画面感，避免泛泛的赞美之词
 5. summary 为 100-150 字引子：点出这首诗背后最有料的一件事，引人想读全文
+6. composed 为成诗时间，尽量翔实但绝不编造：
+   - era：朝代 + 年号纪年，如"唐 开元十五年"、"宋 元丰五年"；只知朝代则只写朝代
+   - year：公元纪年整数（公元前用负数，如公元前 221 年写 -221）；无法确定则 null
+   - certainty："确切"（有明确记载）、"约"（学界推定或有争议，year 给最常见说法）、"不详"
+   - note：一句话说明依据或分歧，如"据《旧唐书》本传"、"一说作于天宝三载"；不详时说明为何不详
 
 你必须以严格的 JSON 格式返回，schema 如下：
 {
   "summary": string,
+  "composed": {"era": string, "year": integer | null, "certainty": string, "note": string},
   "sections": {
     "author_anecdote": [ {"text": string, "kind": string, "source": string} ],
     "composition":     [ {"text": string, "kind": string, "source": string} ],
@@ -121,7 +127,29 @@ def _validate_and_normalize(data: dict) -> dict | None:
         print("  ⚠ LLM 返回的故事内容为空")
         return None
 
-    return {"summary": summary, "sections": sections}
+    return {"summary": summary, "sections": sections, "composed": _normalize_composed(data.get("composed"))}
+
+
+_CERTAINTIES = ("确切", "约", "不详")
+
+
+def _normalize_composed(raw) -> dict:
+    """成诗时间：era / year（天文纪年前的原始公元数，负数为公元前）/ certainty / note。缺失即"不详"。"""
+    if not isinstance(raw, dict):
+        return {"era": "", "year": None, "certainty": "不详", "note": ""}
+    era = raw.get("era"); era = era.strip() if isinstance(era, str) else ""
+    note = raw.get("note"); note = note.strip() if isinstance(note, str) else ""
+    year = raw.get("year")
+    if isinstance(year, str) and year.strip().lstrip("-").isdigit():
+        year = int(year)
+    if not isinstance(year, int) or isinstance(year, bool) or year == 0 or abs(year) > 3000:
+        year = None
+    certainty = raw.get("certainty")
+    if certainty not in _CERTAINTIES:
+        certainty = "不详" if year is None else "约"
+    if year is None and certainty == "确切":
+        certainty = "不详"
+    return {"era": era, "year": year, "certainty": certainty, "note": note}
 
 
 async def get_story(poem: dict) -> dict | None:

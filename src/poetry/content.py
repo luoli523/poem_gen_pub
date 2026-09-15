@@ -11,6 +11,7 @@ from pathlib import Path
 
 import yaml
 
+from src.common.ganzhi import ce_label, ganzhi_label
 from src.poetry.story import SECTION_LABELS
 
 
@@ -129,6 +130,27 @@ def site_page_dir(poem: dict) -> str:
     return f"{poem.get('date', '')}-{title}"
 
 
+def composed_lines(composed: dict | None) -> list[str]:
+    """成诗时间的展示行，如 ["唐 开元十五年", "公元 727 年", "丁卯年（兔）"]；不详时给出朝代与说明。
+
+    公元前年份：LLM 给 -221 表示公元前 221 年，换成天文纪年 1-221 再算干支。
+    """
+    if not composed:
+        return []
+    era, year, certainty = composed.get("era", ""), composed.get("year"), composed.get("certainty", "不详")
+    prefix = "约 " if certainty == "约" else ""
+    lines = []
+    if era:
+        lines.append(prefix + era)
+    if year is not None:
+        astro = year if year > 0 else year + 1
+        lines.append(prefix + ce_label(astro))
+        lines.append(ganzhi_label(astro))
+    elif certainty == "不详":
+        lines.append("作年不详")
+    return lines
+
+
 def page_url(base_url: str, poem: dict) -> str:
     """诗词页在站点上的 URL（目录名已 URL 安全，只需百分号编码中文）。"""
     from urllib.parse import quote
@@ -161,6 +183,7 @@ def generate_site_page(
     """
     sections = (story or {}).get("sections", {})
     summary = (story or {}).get("summary", "")
+    composed = (story or {}).get("composed") or {}
 
     present_categories = [SECTION_LABELS[k] for k, items in sections.items() if items]
     present_kinds = sorted({i["kind"] for items in sections.values() for i in items})
@@ -180,6 +203,11 @@ def generate_site_page(
         "tale_title": tale["title"] if tale else "",
         "infographic": infographic or "",
         "jieling": list(jieling or []),
+        "composed_era": composed.get("era", ""),
+        "composed_year": composed.get("year"),
+        "composed_certainty": composed.get("certainty", ""),
+        "composed_note": composed.get("note", ""),
+        "composed_lines": composed_lines(composed),
         "summary": summary,
     }
     front_text = yaml.safe_dump(front, allow_unicode=True, sort_keys=False).rstrip()

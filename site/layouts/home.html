@@ -14,7 +14,7 @@
       {{ $m := strings.FindRESubmatch `(?s)<h2 id="诗词全文">.*?</h2>\s*<p>(.*?)</p>` (.Content | string) 1 }}
       {{ with $m }}<p class="poem">{{ partial "poem-lines.html" (index (index . 0) 1) }}</p>{{ end }}
       <h1 class="today-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h1>
-      <p class="today-meta">{{ with site.GetPage (printf "/authors/%s" .Params.author) }}<a class="seal seal-inline" href="{{ .RelPermalink }}" aria-label="作者 {{ .Title }}">{{ .Title }}</a>{{ end }}{{ .Params.dynasty }}·{{ .Params.author }}<span>{{ .Date.Format "2006年1月2日" }}</span>{{ with .Params.occasion }}<span>{{ . }}</span>{{ end }}</p>
+      <p class="today-meta">{{ with site.GetPage (printf "/authors/%s" .Params.author) }}<a class="seal seal-inline" href="{{ .RelPermalink }}" aria-label="作者 {{ .Title }}">{{ .Title }}</a>{{ end }}{{ .Params.dynasty }}·{{ .Params.author }}{{ with .Params.composed_lines }}<span>{{ delimit . " · " }}</span>{{ else }}<span>{{ .Date.Format "2006年1月2日" }}</span>{{ end }}{{ with .Params.occasion }}<span>{{ . }}</span>{{ end }}</p>
       {{ with .Params.summary }}<p class="today-summary">{{ . }}</p>{{ end }}
       <a class="more" href="{{ .RelPermalink }}">读这首的背后</a>
     </div>
@@ -39,8 +39,8 @@
       <a class="today-fig" href="{{ $latest.RelPermalink }}"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $latest.Title }} 信息图" loading="lazy" decoding="async"></a>
       {{ end }}
       <div class="today-text">
-        <h3 class="today-title"><a href="{{ $latest.RelPermalink }}">{{ $latest.Params.jieling_name }}<small>{{ $latest.Params.year }}</small></a></h3>
-        <p class="today-meta">{{ $sealText := $latest.Params.ethnic | default $latest.Params.category }}{{ with site.GetPage (printf "/jieling_categories/%s" $sealText) }}<a class="seal seal-inline" href="{{ .RelPermalink }}">{{ $sealText }}</a>{{ end }}{{ with $latest.Params.lunar }}<span>{{ . }}</span>{{ end }}{{ with $latest.Params.season }}<span>{{ . }}季</span>{{ end }}<span>{{ $latest.Date.Format "2006年1月2日" }}</span></p>
+        <h3 class="today-title"><a href="{{ $latest.RelPermalink }}">{{ $latest.Params.jieling_name }}<small>{{ with $latest.Params.ganzhi }}{{ . }}年{{ else }}{{ $latest.Params.year }}{{ end }}</small></a></h3>
+        <p class="today-meta">{{ $sealText := $latest.Params.ethnic | default $latest.Params.category }}{{ with site.GetPage (printf "/jieling_categories/%s" $sealText) }}<a class="seal seal-inline" href="{{ .RelPermalink }}">{{ $sealText }}</a>{{ end }}{{ with $latest.Params.ganzhi }}<span>{{ . }}年{{ with $latest.Params.zodiac }}（{{ . }}）{{ end }}</span>{{ end }}{{ with $latest.Params.lunar }}<span>{{ . }}</span>{{ end }}{{ with $latest.Params.season }}<span>{{ . }}季</span>{{ end }}<span>{{ $latest.Date.Format "2006年1月2日" }}</span></p>
         {{ with $latest.Params.summary }}<p class="today-summary">{{ . }}</p>{{ end }}
         <a class="more" href="{{ $latest.RelPermalink }}">读这个节令的档案</a>
       </div>

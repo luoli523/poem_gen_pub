@@ -296,3 +296,25 @@ class TestTaleExpansion:
         with patch("openai.AsyncOpenAI", return_value=mock_client):
             await get_tale(sample_poem, None, [])
         assert mock_create.call_count == 1
+
+
+class TestComposed:
+
+    def test_full(self):
+        from src.poetry.story import _normalize_composed
+        c = _normalize_composed({"era": "唐 开元十五年", "year": 727, "certainty": "确切", "note": "据本传"})
+        assert c == {"era": "唐 开元十五年", "year": 727, "certainty": "确切", "note": "据本传"}
+
+    def test_missing_or_bad(self):
+        from src.poetry.story import _normalize_composed
+        assert _normalize_composed(None)["certainty"] == "不详"
+        assert _normalize_composed({"era": "唐", "year": "abc"})["year"] is None
+        assert _normalize_composed({"year": "727"})["year"] == 727
+        assert _normalize_composed({"year": 0})["year"] is None
+        assert _normalize_composed({"year": 727, "certainty": "大概"})["certainty"] == "约"
+        assert _normalize_composed({"era": "唐", "certainty": "确切"})["certainty"] == "不详"   # 无年份不能算确切
+
+    def test_story_carries_composed(self):
+        data = dict(MOCK_STORY_RESPONSE, composed={"era": "宋 元丰五年", "year": 1082, "certainty": "确切", "note": ""})
+        out = _validate_and_normalize(json.loads(json.dumps(data)))
+        assert out["composed"]["year"] == 1082

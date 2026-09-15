@@ -148,3 +148,9 @@ class TestGetJielingStory:
         client = MagicMock(); client.chat.completions.create = AsyncMock(side_effect=Exception("x"))
         with patch("openai.AsyncOpenAI", return_value=client):
             assert await get_jieling_story(bailu, []) is None
+
+
+def test_page_title_uses_ganzhi(bailu, story):
+    import yaml
+    front = yaml.safe_load(jc.generate_site_page(dict(bailu, ganzhi="丙午", zodiac="马"), story).split("---\n", 2)[1])
+    assert front["title"] == "白露 · 丙午年" and front["ganzhi"] == "丙午" and front["year"] == "2026"

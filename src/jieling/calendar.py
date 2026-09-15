@@ -11,6 +11,7 @@
 from datetime import datetime, timedelta
 
 from src.common.constants import JIEQI_NAMES
+from src.common.ganzhi import ganzhi_year
 
 # 类别常量
 JIEQI = "节气"
@@ -82,6 +83,15 @@ def _lunar(dt: datetime):
         return None
 
 
+def _lunar_year(dt: datetime) -> int | None:
+    """农历年（干支按农历年算：春节前仍属上一年）。"""
+    try:
+        from zhdate import ZhDate
+        return ZhDate.from_datetime(dt).lunar_year
+    except Exception:
+        return None
+
+
 def _lunar_label(month: int, day: int) -> str:
     months = ["正", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "腊"]
     if day == 10:
@@ -110,10 +120,13 @@ def get_jieling(date_str: str) -> list[dict]:
         return []
 
     found: list[dict] = []
+    ly = _lunar_year(dt)
+    ganzhi, zodiac = ganzhi_year(ly) if ly else ("", "")
 
     def add(name: str, category: str, ethnic: str, lunar: str = "", season: str = ""):
         found.append({"name": name, "category": category, "ethnic": ethnic,
-                      "date": date_str, "season": season, "lunar": lunar})
+                      "date": date_str, "season": season, "lunar": lunar,
+                      "ganzhi": ganzhi, "zodiac": zodiac})
 
     jq = _jieqi_name(dt)
     if jq:

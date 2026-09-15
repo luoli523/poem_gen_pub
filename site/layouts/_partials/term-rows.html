@@ -8,7 +8,7 @@
     <a class="zoom-link thumb" href="{{ .RelPermalink }}" data-alt="{{ $first.Title }} 信息图" title="放大信息图"><img src="{{ $t.RelPermalink }}" width="{{ $t.Width }}" height="{{ $t.Height }}" alt="" loading="lazy" decoding="async"></a>
     {{ else }}<span class="thumb empty" aria-hidden="true"></span>{{ end }}
     <time datetime="{{ $first.Date.Format "2006-01-02" }}">{{ $first.Date.Format "1月2日" }}<small>{{ $first.Date.Format "2006" }}</small></time>
-    <span class="t-wrap"><a class="t" href="{{ $first.RelPermalink }}">{{ .Key }}</a>{{ if gt (len .Pages) 1 }}<span class="years">{{ range .Pages.ByDate.Reverse }}<a href="{{ .RelPermalink }}">{{ .Params.year }}</a>{{ end }}</span>{{ end }}</span>
+    <span class="t-wrap"><a class="t" href="{{ $first.RelPermalink }}">{{ .Key }}</a>{{ if gt (len .Pages) 1 }}<span class="years">{{ range .Pages.ByDate.Reverse }}<a href="{{ .RelPermalink }}">{{ .Params.ganzhi | default .Params.year }}</a>{{ end }}</span>{{ end }}</span>
     <span class="who">{{ $first.Params.ethnic | default $first.Params.category }}</span>
     <span class="occ">{{ $first.Params.lunar | default $first.Params.season }}</span>
   </li>

@@ -117,6 +117,7 @@ main { max-width: 72rem; margin: 0 auto; padding-block: 2.5rem 4rem; }
 }
 .spine-who, .spine-date, .spine-occ { margin: 0; writing-mode: vertical-rl; color: var(--ink-2); font-size: .9rem; letter-spacing: .1em; }
 .spine-date time { font-variant-numeric: tabular-nums; }
+.spine-note { margin: 0; writing-mode: vertical-rl; color: var(--ink-2); font-size: .8rem; letter-spacing: .06em; max-height: 14em; overflow: hidden; text-overflow: ellipsis; }
 .seal {
   margin-top: .4rem; writing-mode: vertical-rl; text-orientation: upright;
   font-family: var(--kai); font-size: 1rem; letter-spacing: .1em; line-height: 1.1;
@@ -170,7 +171,8 @@ dialog.zoom p { position: fixed; bottom: .8rem; left: 0; right: 0; text-align: c
   .leaf { grid-template-columns: 1fr; }
   .spine { position: static; border-right: 0; border-bottom: 1px solid var(--rule); padding: 0 0 1.2rem; margin-bottom: 1.5rem;
     flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: .4rem 1.2rem; min-height: 0; }
-  .spine-title, .spine-who, .spine-date, .spine-occ, .seal { writing-mode: horizontal-tb; text-orientation: mixed; }
+  .spine-title, .spine-who, .spine-date, .spine-occ, .spine-note, .seal { writing-mode: horizontal-tb; text-orientation: mixed; }
+  .spine-note { max-height: none; flex-basis: 100%; }
   .spine-title { font-size: 1.7rem; letter-spacing: .05em; }
   .seal { margin-left: auto; padding: .1em .5em; }
   .body li.noted { grid-template-columns: 1fr; }

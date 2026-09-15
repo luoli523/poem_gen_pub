@@ -54,11 +54,14 @@ def generate_site_page(item: dict, story: dict | None, infographic: str | None =
     summary = (story or {}).get("summary", "")
     year = item["date"][:4]
 
+    gz = item.get("ganzhi", "")
     front = {
-        "title": f"{item['name']} · {year}",
+        "title": f"{item['name']} · {gz}年" if gz else f"{item['name']} · {year}",
         "date": item["date"],
         "jieling_name": item["name"],
         "year": year,
+        "ganzhi": gz,
+        "zodiac": item.get("zodiac", ""),
         "category": item["category"],
         "ethnic": item.get("ethnic", ""),
         "lunar": item.get("lunar", ""),
@@ -73,7 +76,8 @@ def generate_site_page(item: dict, story: dict | None, infographic: str | None =
     front_text = yaml.safe_dump(front, allow_unicode=True, sort_keys=False).rstrip()
 
     who = item["category"] if not item.get("ethnic") else f"{item['ethnic']}·{item['category']}"
-    when = "，".join(x for x in [item.get("lunar", ""), f"{item['season']}季" if item.get("season") else ""] if x)
+    when = "，".join(x for x in [f"{gz}年" if gz else "", item.get("lunar", ""),
+                                f"{item['season']}季" if item.get("season") else ""] if x)
     body = [f"---\n{front_text}\n---", "", f"**{who}** · {item['date']}{'（' + when + '）' if when else ''}", ""]
     if infographic:
         body += [f"![{item['name']} {year} 信息图]({infographic})", ""]
@@ -100,7 +104,8 @@ def generate_nlm_markdown(item: dict, story: dict) -> str:
     """NotebookLM source：节令基本信息 + 六类素材正文（不带可信度标记，避免进入信息图）。"""
     year = item["date"][:4]
     who = item["category"] if not item.get("ethnic") else f"{item['ethnic']}·{item['category']}"
-    lines = [f"# {item['name']}（{year}）— {who}", "", f"**日期**：{item['date']}"]
+    gz = item.get("ganzhi", "")
+    lines = [f"# {item['name']}（{gz + '年，' if gz else ''}{year}）— {who}", "", f"**日期**：{item['date']}"]
     if item.get("lunar"):
         lines.append(f"**农历**：{item['lunar']}")
     lines += ["", "## 引子", "", story.get("summary", "")]

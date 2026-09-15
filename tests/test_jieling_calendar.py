@@ -55,3 +55,11 @@ def test_ordinary_day_empty():
 
 def test_bad_date():
     assert get_jieling("nope") == []
+
+
+def test_ganzhi_follows_lunar_year():
+    assert get_jieling("2026-09-23")[0]["ganzhi"] == "丙午" and get_jieling("2026-09-23")[0]["zodiac"] == "马"
+    # 2026-02-16 是腊月廿九（除夕），农历仍在乙巳年
+    eve = [j for j in get_jieling("2026-02-16") if j["name"] == "除夕"][0]
+    assert eve["ganzhi"] == "乙巳"
+    assert [j for j in get_jieling("2026-02-17") if j["name"] == "春节"][0]["ganzhi"] == "丙午"

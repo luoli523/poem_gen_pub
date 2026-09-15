@@ -3,7 +3,8 @@
   <aside class="spine">
     <h1 class="spine-title">{{ .Title }}</h1>
     <p class="spine-who">{{ .Params.dynasty }}·{{ .Params.author }}</p>
-    <p class="spine-date"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006年1月2日" }}</time></p>
+    {{ with .Params.composed_lines }}{{ range . }}<p class="spine-date composed">{{ . }}</p>{{ end }}{{ else }}<p class="spine-date"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006年1月2日" }}</time></p>{{ end }}
+    {{ with .Params.composed_note }}<p class="spine-note" title="{{ . }}">{{ . }}</p>{{ end }}
     {{ with .Params.occasion }}{{ with site.GetPage (printf "/occasions/%s" .) }}<p class="spine-occ"><a href="{{ .RelPermalink }}">{{ .Title }}</a></p>{{ end }}{{ end }}
     {{ range .Params.jieling }}{{ with site.GetPage (printf "/jieling/%s" .) }}<p class="spine-occ"><a href="{{ .RelPermalink }}">{{ .Title }}</a></p>{{ end }}{{ end }}
     {{ with site.GetPage (printf "/authors/%s" .Params.author) }}<a class="seal" href="{{ .RelPermalink }}" aria-label="作者 {{ .Title }}" data-pagefind-meta="作者">{{ .Title }}</a>{{ end }}
