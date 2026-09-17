@@ -1,0 +1,19 @@
+{{/*
+  邮件订阅：纯 HTML 表单，POST 到 subscribe.guige.ai（仓库 luoli523/guige-subscribe，名单在 Resend）。
+  放在版末 colophon 里，全站统一；本站默认只勾「鬼话诗」。样式在 assets/css/main.css「订阅」一节。
+*/}}
+<form class="subscribe" action="{{ site.Params.subscribe.endpoint }}" method="post" aria-label="邮件订阅">
+  <p class="subscribe-lead">每日一首，寄到邮箱。只寄诗与引子，每封可退。</p>
+  <div class="subscribe-lists">
+    <label><input type="checkbox" name="list" value="poem" checked> 鬼话诗</label>
+    <label><input type="checkbox" name="list" value="ai"> AI 每日动态</label>
+    <label><input type="checkbox" name="list" value="blog"> 鬼哥博客</label>
+  </div>
+  <div class="subscribe-row">
+    <input class="subscribe-input" type="email" name="email" placeholder="你的邮箱" autocomplete="email" required aria-label="邮箱地址">
+    <button class="subscribe-btn seal" type="submit">订</button>
+  </div>
+  <input type="hidden" name="source" value="poem">
+  <input type="hidden" name="back" value="{{ .Permalink }}">
+  <input class="visually-hidden" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+</form>

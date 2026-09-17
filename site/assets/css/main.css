@@ -193,3 +193,19 @@ dialog.zoom p { position: fixed; bottom: .8rem; left: 0; right: 0; text-align: c
   .catalog.terms-catalog li { grid-template-columns: 3rem 6.5em minmax(0, 1fr); }
   .catalog.terms-catalog .who, .catalog.terms-catalog .occ { grid-column: 3; border-left: 0; padding-top: .1em; font-size: .9rem; }
 }
+
+/* ── 订阅：版末一行界行式表单，与站内搜索框同制；「订」用名章样式 ── */
+.subscribe { margin-top: 1.5rem; max-width: var(--measure); }
+.subscribe-lead { margin: 0 0 .4rem; }
+.subscribe-lists { display: flex; flex-wrap: wrap; gap: .2em 1.4em; margin-bottom: .5rem; }
+.subscribe-lists label { display: inline-flex; align-items: center; gap: .4em; cursor: pointer; }
+.subscribe-lists input { accent-color: var(--indigo); margin: 0; }
+.subscribe-row { display: flex; align-items: flex-end; gap: 1rem; }
+.subscribe-input {
+  flex: 1; min-width: 0; font: inherit; color: var(--ink); background: transparent;
+  border: 0; border-bottom: 1px solid var(--rule); padding: .2em 0; transition: border-color .15s;
+}
+.subscribe-input:focus { outline: 0; border-bottom-color: var(--indigo); }
+.subscribe-input::placeholder { color: var(--ink-2); opacity: .8; }
+.subscribe-btn { cursor: pointer; border: 0; font-size: .95rem; padding: .35em .5em .3em; }   /* 其余交给 .seal */
+@media (prefers-reduced-motion: reduce) { .subscribe-input { transition: none; } }

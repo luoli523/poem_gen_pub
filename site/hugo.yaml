@@ -48,6 +48,9 @@ menu:
       weight: 6
 
 params:
+  # 邮件订阅入口（仓库 luoli523/guige-subscribe，名单在 Resend）；群发由 pages.yml 的 notify job 触发
+  subscribe:
+    endpoint: https://subscribe.guige.ai/subscribe
   # 站点访问统计：Cloudflare Web Analytics，与主站共用 token（同域名，后台按路径区分）
   analytics:
     cloudflare:
