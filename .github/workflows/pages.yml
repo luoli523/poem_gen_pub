@@ -64,3 +64,29 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # 邮件订阅：部署完成后，把今天（北京日期）新出现的诗词页通过 Resend 发给「鬼话诗」名单（诗句 + 引子 + 链接）。
+  # 本 workflow 由 workflow_run 触发拿不到 push diff，所以按目录名日期找；脚本按 name 幂等，重复部署不会重发。
+  # 脚本与 guige-ai-site 共用一份，直接拉取。
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Notify subscribers of today's poems
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          TODAY=$(TZ=Asia/Shanghai date +%F)
+          NEW=$(ls -d site/content/poems/${TODAY}-*/ 2>/dev/null || true)
+          if [ -z "$NEW" ]; then echo "今天（$TODAY）没有新诗词页，跳过"; exit 0; fi
+          curl -fsSL -o notify_subscribers.py \
+            https://raw.githubusercontent.com/luoli523/guige-ai-site/main/scripts/notify_subscribers.py
+          for D in $NEW; do
+            python3 notify_subscribers.py --kind poem --file "${D}index.md" \
+              --base-url https://luoli523.github.io/poem_gen_pub \
+              --audience 32bad0bc-684d-4ade-8128-37d3000b9b2f
+          done
