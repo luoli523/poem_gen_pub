@@ -36,6 +36,8 @@ hugo --source site server            # 搜索页需先 hugo 构建后执行 npx 
 
 每日流水线的完整流程、各环节失败后果与维护操作见 [docs/daily-run.md](docs/daily-run.md)。
 
+邮件订阅：版末表单 → `subscribe.guige.ai` → Resend 名单「鬼话诗」；`pages.yml` 部署后把当日新诗词群发给订阅者。运维手册见主站 [docs/NEWSLETTER.md](https://github.com/luoli523/luoli523.github.io/blob/master/docs/NEWSLETTER.md)。
+
 ## 快速开始
 
 ### 1. 安装依赖
