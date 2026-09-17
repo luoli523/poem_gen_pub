@@ -197,9 +197,6 @@ dialog.zoom p { position: fixed; bottom: .8rem; left: 0; right: 0; text-align: c
 /* ── 订阅：版末一行界行式表单，与站内搜索框同制；「订」用名章样式 ── */
 .subscribe { margin-top: 1.5rem; max-width: var(--measure); }
 .subscribe-lead { margin: 0 0 .4rem; }
-.subscribe-lists { display: flex; flex-wrap: wrap; gap: .2em 1.4em; margin-bottom: .5rem; }
-.subscribe-lists label { display: inline-flex; align-items: center; gap: .4em; cursor: pointer; }
-.subscribe-lists input { accent-color: var(--indigo); margin: 0; }
 .subscribe-row { display: flex; align-items: flex-end; gap: 1rem; }
 .subscribe-input {
   flex: 1; min-width: 0; font: inherit; color: var(--ink); background: transparent;
