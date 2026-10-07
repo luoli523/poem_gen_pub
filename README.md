@@ -24,7 +24,7 @@
 ## 网站
 
 内容页积累在 `site/content/poems/`（每首一个目录：`index.md` + `infographic.webp`），由 Hugo 构建，
-每日流水线完成后自动发布到 <https://luoli523.github.io/poem_gen_pub/>。
+每日流水线完成后自动发布到 <https://guige.ai/poem_gen_pub/>。
 版式取自宋版书（界行、竖排题名、眉批式的可信度与出处），主题在 `site/layouts` 与 `site/assets/css`，无外部主题依赖。
 可按作者 / 朝代 / 场景 / 素材分类 / 可信度浏览；全文搜索由 Pagefind 在构建后生成。
 

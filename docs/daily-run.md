@@ -65,7 +65,7 @@ flowchart TD
         ART --> PAGES[workflow_run → pages.yml<br/>Hugo 构建 → Pagefind 索引 → GitHub Pages]
     end
 
-    PAGES --> SITE([🌐 luoli523.github.io/poem_gen_pub])
+    PAGES --> SITE([🌐 guige.ai/poem_gen_pub])
 
     style P1 fill:#fff3e0,stroke:#b4402c
     style P2 fill:#fff3e0,stroke:#b4402c

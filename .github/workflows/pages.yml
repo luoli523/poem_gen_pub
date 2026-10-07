@@ -87,6 +87,6 @@ jobs:
             https://raw.githubusercontent.com/luoli523/guige-ai-site/main/scripts/notify_subscribers.py
           for D in $NEW; do
             python3 notify_subscribers.py --kind poem --file "${D}index.md" \
-              --base-url https://luoli523.github.io/poem_gen_pub \
+              --base-url https://guige.ai/poem_gen_pub \
               --audience 32bad0bc-684d-4ade-8128-37d3000b9b2f
           done
