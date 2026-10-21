@@ -8,7 +8,7 @@ on:
     # 支持手动触发
     inputs:
       dry_run:
-        description: "只生成内容并提交，不跑 NotebookLM / Telegram / Instagram（调 prompt 用）"
+        description: "只生成内容并提交，不跑 NotebookLM / Telegram / Instagram / 图片机器人 webhook（调 prompt 用）"
         type: boolean
         default: false
       date:
@@ -17,6 +17,10 @@ on:
         default: ""
       only_jieling:
         description: "只跑节令，不选诗（回补节令时用）"
+        type: boolean
+        default: false
+      image_overwrite:
+        description: "通知图片机器人覆盖已有 infographic.webp（默认不覆盖）"
         type: boolean
         default: false
 
@@ -85,20 +89,62 @@ jobs:
           ${{ inputs.dry_run && '--no-nlm --no-ig' || '' }}
           ${{ inputs.date != '' && format('--date {0}', inputs.date) || '' }}
           ${{ inputs.only_jieling && '--no-poetry' || '' }}
+          ${{ inputs.image_overwrite && '--image-overwrite' || '' }}
 
       - name: Commit generated content
+        id: commit
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add site/content data/poem_history.json
+          committed=false
           if git diff --cached --quiet; then
             echo "无新增内容，跳过提交"
+          else
+            git commit -m "content: $(date -u +%Y-%m-%d) 每日诗词与背后的故事"
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+            committed=true
+          fi
+          echo "committed=$committed" >> "$GITHUB_OUTPUT"
+
+      - name: Notify image bot
+        # 只在内容真正提交之后通知。dry_run 用来调 prompt，不跑外部发布
+        # （NotebookLM / Telegram / Instagram），图片机器人同样会出图并推回仓库，所以也不通知。
+        # 流水线 exit 1（例如 NotebookLM 失败）但页面已提交时仍然 POST，机器人可以补图。
+        # manifest 在两种情况下都会写到 output/infographic-manifests/，随 artifact 可查看。
+        if: always() && cancelled() == false && steps.commit.conclusion == 'success' && steps.commit.outputs.committed == 'true' && (github.event_name != 'workflow_dispatch' || inputs.dry_run == false)
+        continue-on-error: true
+        env:
+          IMAGE_BOT_WEBHOOK_URL: ${{ secrets.IMAGE_BOT_WEBHOOK_URL }}
+          IMAGE_BOT_WEBHOOK_KEY: ${{ secrets.IMAGE_BOT_WEBHOOK_KEY }}
+        run: |
+          if [ -z "$IMAGE_BOT_WEBHOOK_URL" ] || [ -z "$IMAGE_BOT_WEBHOOK_KEY" ]; then
+            echo "::notice::缺少 secret IMAGE_BOT_WEBHOOK_URL 或 IMAGE_BOT_WEBHOOK_KEY，跳过信息图 webhook"
             exit 0
           fi
-          git commit -m "content: $(date -u +%Y-%m-%d) 每日诗词与背后的故事"
-          git pull --rebase origin "$GITHUB_REF_NAME"
-          git push origin "HEAD:$GITHUB_REF_NAME"
+          shopt -s nullglob
+          manifests=(output/infographic-manifests/*.json)
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo "本次提交没有信息图 manifest，跳过 webhook"
+            exit 0
+          fi
+          failed=0
+          while IFS= read -r manifest; do
+            echo "通知信息图机器人: $(basename "$manifest")"
+            if ! curl --fail-with-body --silent --show-error \
+                --max-time 30 \
+                -X POST \
+                -H "Authorization: Bearer ${IMAGE_BOT_WEBHOOK_KEY}" \
+                -H "Content-Type: application/json" \
+                --data-binary @"$manifest" \
+                "$IMAGE_BOT_WEBHOOK_URL"; then
+              echo "::warning::信息图 webhook 失败: $(basename "$manifest")"
+              failed=1
+            fi
+          done < <(printf '%s\n' "${manifests[@]}" | sort)
+          exit "$failed"
 
       - name: Upload output as artifact
         if: always()

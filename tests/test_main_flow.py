@@ -1,9 +1,14 @@
 """Tests for main.py degradation paths: NotebookLM errors are contained and reported, never fatal."""
 
+import json
+from pathlib import Path
+
 import pytest
 from unittest.mock import AsyncMock, patch
 
 import main
+from src.jieling.content import page_url as jieling_page_url
+from src.poetry.content import page_url as poetry_page_url, site_page_dir
 
 
 def _pipeline_kwargs(tmp_path, **over):
@@ -72,6 +77,41 @@ class TestPoemFlowProblems:
         problems = await self._run(tmp_path, sample_poem, {"summary": "s", "sections": {}}, None, skip_nlm=True)
         assert problems == []
 
+    @pytest.mark.asyncio
+    async def test_manifest_for_poem_even_when_nlm_skipped(self, tmp_path, sample_poem, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        story = {"summary": "s", "sections": {}}
+        base = "https://guige.ai/poem_gen_pub/"
+        with patch.object(main, "_build_poem_story", AsyncMock(return_value=(story, None))), \
+             patch.object(main, "_run_content_pipeline", AsyncMock(return_value=None)):
+            await main._run_poem_flow(
+                sample_poem, name_key="k", today=sample_poem["date"], output_dir=Path("output"),
+                site_dir=Path("site/content/poems"), skip_notebooklm=True, skip_ig=True,
+                tale_enabled=False, ratio="4:5", problems=[], base_url=base,
+                image_overwrite=True,
+            )
+        data = json.loads(next(Path("output/infographic-manifests").glob("*.json")).read_text(encoding="utf-8"))
+        assert data["date"] == sample_poem["date"]
+        assert data["prompt"] == sample_poem["infographic_prompt"]
+        assert data["content_dir"] == f"site/content/poems/{site_page_dir(sample_poem)}"
+        assert data["upload_path"] == data["content_dir"] + "/infographic.webp"
+        assert data["page_url"] == poetry_page_url(base, sample_poem)
+        assert data["overwrite"] is True
+
+    @pytest.mark.asyncio
+    async def test_blank_poem_prompt_skips_manifest(self, tmp_path, sample_poem, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        poem = dict(sample_poem)
+        poem["infographic_prompt"] = "  "
+        with patch.object(main, "_build_poem_story", AsyncMock(return_value=({"summary": "s", "sections": {}}, None))), \
+             patch.object(main, "_run_content_pipeline", AsyncMock(return_value=None)):
+            await main._run_poem_flow(
+                poem, name_key="k", today=poem["date"], output_dir=Path("output"),
+                site_dir=Path("site/content/poems"), skip_notebooklm=True, skip_ig=True,
+                tale_enabled=False, ratio="4:5", problems=[],
+            )
+        assert list(Path("output").glob("infographic-manifests/*.json")) == []
+
 
 class TestPageNotification:
 
@@ -119,6 +159,17 @@ class TestPageNotification:
                                          ratio="4:5", problems=[], base_url="https://x.io/p/")
         text = notify.call_args.args[0]
         assert "<b>白露</b>" in text and 'href="https://x.io/p/terms/%E7%99%BD%E9%9C%B2/2026/"' in text
+
+
+class TestImageOverwriteFlag:
+
+    def test_default_false(self, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["main.py"])
+        assert main.parse_args().image_overwrite is False
+
+    def test_flag_sets_true(self, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["main.py", "--image-overwrite"])
+        assert main.parse_args().image_overwrite is True
 
 
 class TestReportProblems:
@@ -177,6 +228,42 @@ class TestJielingFlow:
         problems, _ = await self._run(tmp_path, item, None, None)
         d = tmp_path / "terms" / "白露" / "2026"
         assert "素材生成失败" in problems[0] and (d / "index.md").exists() and not (d / "story.json").exists()
+        assert not (tmp_path / "out" / "infographic-manifests").exists()
+
+    @pytest.mark.asyncio
+    async def test_jieling_manifest(self, tmp_path, item, story, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        base = "https://guige.ai/poem_gen_pub/"
+        problems: list[str] = []
+        with patch.object(main, "get_jieling_story", AsyncMock(return_value=story)), \
+             patch.object(main, "_run_content_pipeline", AsyncMock(return_value=None)):
+            await main._run_jieling_flow(
+                item, today=item["date"], output_dir=Path("output"),
+                terms_dir=Path("site/content/terms"), skip_notebooklm=True, skip_ig=True,
+                ratio="4:5", problems=problems, base_url=base,
+            )
+        data = json.loads(next(Path("output/infographic-manifests").glob("*.json")).read_text(encoding="utf-8"))
+        assert problems == []
+        assert data["date"] == "2026-09-07"
+        assert data["prompt"] == "p"
+        assert data["content_dir"] == "site/content/terms/白露/2026"
+        assert data["upload_path"] == "site/content/terms/白露/2026/infographic.webp"
+        assert data["page_url"] == jieling_page_url(base, item)
+        assert data["overwrite"] is False
+
+    @pytest.mark.asyncio
+    async def test_empty_jieling_prompt_skips_manifest(self, tmp_path, item, story, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        story = dict(story)
+        story["infographic_prompt"] = ""
+        with patch.object(main, "get_jieling_story", AsyncMock(return_value=story)), \
+             patch.object(main, "_run_content_pipeline", AsyncMock(return_value=None)):
+            await main._run_jieling_flow(
+                item, today=item["date"], output_dir=Path("output"),
+                terms_dir=Path("site/content/terms"), skip_notebooklm=True, skip_ig=True,
+                ratio="4:5", problems=[],
+            )
+        assert list(Path("output").glob("infographic-manifests/*.json")) == []
 
     @pytest.mark.asyncio
     async def test_previous_year_fed_to_llm(self, tmp_path, item, story):
