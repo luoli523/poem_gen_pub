@@ -18,6 +18,7 @@ from src.common.telegram import send_message as telegram_send_message, get_teleg
 from src.common.instagram import get_ig_config, publish_album as ig_publish_album
 from src.common.notebooklm import check_auth as check_nlm_auth, run_pipeline as nlm_run_pipeline
 from src.common.constants import beijing_today
+from src.common.infographic_manifest import write_infographic_manifest
 
 # ── 节令模块（节气 + 汉族节日 + 少数民族节日）──
 from src.jieling.calendar import get_jieling
@@ -53,6 +54,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ratio", type=str, default="4:5",
                         choices=["4:5", "9:16", "1:1", "16:9"],
                         help="信息图长宽比例（默认 4:5）")
+    parser.add_argument("--image-overwrite", action="store_true",
+                        help="信息图 manifest 的 overwrite=true（外部图片机器人覆盖已有 infographic.webp）")
 
     return parser.parse_args()
 
@@ -61,6 +64,19 @@ def load_config(config_path: str = "config/config.yaml") -> dict:
     """加载配置文件"""
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def _emit_infographic_manifest(
+    output_dir: Path, *, date: str, prompt: str, content_dir: Path,
+    page_url: str, overwrite: bool, kind: str, name: str,
+) -> None:
+    """有信息图 prompt 时把一份 manifest 写到 output/。NotebookLM 是否成功不影响这份文件。"""
+    path = write_infographic_manifest(
+        output_dir, date=date, prompt=prompt, content_dir=content_dir,
+        page_url=page_url, overwrite=overwrite, kind=kind, name=name,
+    )
+    if path:
+        print(f"  📋 信息图 manifest: {path}")
 
 
 # ── 通用内容管线 ──
@@ -216,6 +232,7 @@ async def _run_poem_flow(
     poem: dict, name_key: str, today: str, output_dir: Path, site_dir: Path,
     skip_notebooklm: bool, skip_ig: bool, tale_enabled: bool, ratio: str,
     problems: list[str], jieling: list[str] | None = None, base_url: str = "",
+    image_overwrite: bool = False,
 ) -> None:
     """诗词完整流程：故事 → 先落一版无图页面 → 信息图/推送 → 图转 WebP 存入页面目录并重写页面。
 
@@ -226,6 +243,16 @@ async def _run_poem_flow(
     if story is None:
         problems.append(f"《{poem['title']}》背后的故事生成失败，页面已落地但无故事（可用 --poem 回补）")
     _write_poem_page(poem, site_dir, story, tale, jieling=jieling)
+    _emit_infographic_manifest(
+        output_dir,
+        date=poem.get("date") or today,
+        prompt=poem.get("infographic_prompt") or "",
+        content_dir=site_dir / poetry_site_page_dir(poem),
+        page_url=poetry_page_url(base_url, poem) if base_url else "",
+        overwrite=image_overwrite,
+        kind="poetry",
+        name=poem.get("title") or name_key,
+    )
 
     image = await _run_content_pipeline(
         label="诗词",
@@ -284,6 +311,7 @@ async def _report_problems(today: str, problems: list[str]) -> None:
 async def _run_jieling_flow(
     item: dict, today: str, output_dir: Path, terms_dir: Path,
     skip_notebooklm: bool, skip_ig: bool, ratio: str, problems: list[str], base_url: str = "",
+    image_overwrite: bool = False,
 ) -> None:
     """一个节令的完整流程：读往年 → 生成素材 → 先落页面 + story.json → 信息图/推送 → 补图。
 
@@ -307,6 +335,16 @@ async def _run_jieling_flow(
     jieling_content.save_story_json(page_dir, story)
     (page_dir / "index.md").write_text(jieling_content.generate_site_page(item, story), encoding="utf-8")
     print(f"  📄 节令档案页: {page_dir / 'index.md'}")
+    _emit_infographic_manifest(
+        output_dir,
+        date=item.get("date") or today,
+        prompt=story.get("infographic_prompt") or "",
+        content_dir=page_dir,
+        page_url=jieling_content.page_url(base_url, item) if base_url else "",
+        overwrite=image_overwrite,
+        kind="jieling",
+        name=item["name"],
+    )
 
     data = {**item, "infographic_prompt": story["infographic_prompt"]}
     image = await _run_content_pipeline(
@@ -398,7 +436,7 @@ async def main():
             await _run_jieling_flow(
                 item, today=today, output_dir=output_dir, terms_dir=terms_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, ratio=args.ratio, problems=problems,
-                base_url=base_url,
+                base_url=base_url, image_overwrite=args.image_overwrite,
             )
     else:
         print(f"\n🌿 今日无节令")
@@ -419,6 +457,7 @@ async def main():
                 poem, name_key=poem["title"], today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
                 ratio=args.ratio, problems=problems, jieling=jieling_names, base_url=base_url,
+                image_overwrite=args.image_overwrite,
             )
         else:
             print(f"📜 诗词「{args.poem}」获取失败，跳过")
@@ -433,6 +472,7 @@ async def main():
                 poem, name_key=occasion, today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
                 ratio=args.ratio, problems=problems, jieling=jieling_names, base_url=base_url,
+                image_overwrite=args.image_overwrite,
             )
         else:
             print(f"📜 诗词获取失败，跳过")

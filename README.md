@@ -105,6 +105,7 @@ python main.py
 | `--no-nlm` | 跳过 NotebookLM，只生成 Markdown |
 | `--no-ig` | 跳过 Instagram 发布 |
 | `--no-poetry` | 跳过诗词模块（不调用 LLM） |
+| `--image-overwrite` | 信息图 manifest 的 `overwrite` 为 true（默认 false） |
 
 ## GitHub Actions 自动化
 
@@ -120,12 +121,56 @@ python main.py
 | `IG_USERNAME` | Instagram 用户名 |
 | `IG_PASSWORD` | Instagram 密码 |
 | `IG_SESSION` | Instagram session（base64，可选） |
+| `IMAGE_BOT_WEBHOOK_URL` | 信息图机器人 webhook。内容提交后，把每份 manifest POST 到这个地址。未配置则跳过 |
+| `IMAGE_BOT_WEBHOOK_KEY` | 上面那次 POST 的 Bearer token（`Authorization: Bearer <key>`）。未配置则跳过。日志里不会打印 |
 
 生成 base64 session：
 ```bash
 base64 < ~/.notebooklm/storage_state.json | gh secret set NOTEBOOKLM_STORAGE_STATE
 base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 ```
+
+### 信息图机器人
+
+每日流水线在 **内容确实提交成功之后**，把当天每条信息图请求 POST 给外部图片机器人。机器人按 prompt 生成 `infographic.webp`，再推回仓库。NotebookLM、Telegram、Instagram 的行为不变；manifest 是额外产物。
+
+信息图 prompt 的来源：
+
+- 诗词：`src/poetry/detector.py` 在匹配诗词时让 LLM 返回 `infographic_prompt`（故事那一次调用不再生成这段）
+- 节令：`src/jieling/story.py` 在六类素材之外返回 `infographic_prompt`。素材生成失败、或 prompt 为空时不写 manifest
+
+`main.py` 对每一条非空 prompt 写一份 JSON 到 `output/infographic-manifests/`（该目录在 `.gitignore` 里，随 Actions artifact 保留 7 天）：
+
+- 诗词：`poetry_<YYYY-MM-DD>_<诗题>.json`，`content_dir` 如 `site/content/poems/2026-10-21-偶成`
+- 节令：`jieling_<YYYY-MM-DD>_<节令名>.json`，`content_dir` 如 `site/content/terms/白露/2026`
+
+跳过 NotebookLM（`--no-nlm`，或认证失败）时只要 prompt 还在，manifest 照写，这样机器人可以补图。
+
+载荷字段：`date`、`prompt`（完整信息图 prompt）、`content_dir`（相对仓库根）、`upload_path`（`<content_dir>/infographic.webp`）、可选 `page_url`（配置了 `site.base_url` 时才有）、`overwrite`（默认 `false`）。
+
+```json
+{
+  "date": "2026-10-21",
+  "prompt": "中国古典书画风与现代信息图融合……（完整指令）",
+  "content_dir": "site/content/poems/2026-10-21-偶成",
+  "upload_path": "site/content/poems/2026-10-21-偶成/infographic.webp",
+  "page_url": "https://guige.ai/poem_gen_pub/poems/2026-10-21-%E5%81%B6%E6%88%90/",
+  "overwrite": false
+}
+```
+
+手动触发勾上 `image_overwrite` 时，流水线会带 `--image-overwrite`，载荷里的 `overwrite` 为 `true`。定时运行不带这个参数，保持 `false`。
+
+**什么时候 POST**：`Commit generated content` 成功，并且这次确实产生了 commit（`site/content` 或 `data/poem_history.json` 有变化并 push 上去）之后。定时运行会发；手动运行未勾 `dry_run` 也会发。流水线因为降级以 exit 1 结束、但页面已经提交时仍然发，方便在 NotebookLM 失败时补图。
+
+**什么时候不 POST**：
+
+- `dry_run`：这一档用来调 prompt，不跑 NotebookLM / Telegram / Instagram。图片机器人会出图并推回仓库，同样是外部发布，所以不通知。manifest 仍在 artifact 里，可以查看载荷。
+- 没有新 commit（内容与上次相同）。
+- `IMAGE_BOT_WEBHOOK_URL` 或 `IMAGE_BOT_WEBHOOK_KEY` 有一个缺失：打一条 notice，跳过。
+- 这次提交没有 manifest（例如节令素材失败、诗词没有 prompt）。
+
+每一份 manifest 单独 POST，`Content-Type: application/json`，超时 30 秒。webhook 失败只打 warning，步骤带 `continue-on-error`，不会把这次 run 标红。不会把 key 打进日志。
 
 ## 项目结构
 
@@ -139,7 +184,8 @@ base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 │   │   ├── constants.py         # 共享常量（二十四节气名称等）
 │   │   ├── notebooklm.py       # NotebookLM 通用操作及 pipeline
 │   │   ├── telegram.py          # Telegram 消息发送
-│   │   └── instagram.py         # Instagram 发布
+│   │   ├── instagram.py         # Instagram 发布
+│   │   └── infographic_manifest.py  # 信息图 webhook 用的 JSON manifest
 │   ├── poetry/                  # 诗词模块
 │   │   ├── detector.py          # LLM 诗词匹配
 │   │   └── content.py           # Markdown / IG 文案 / TG 文案

@@ -1,6 +1,6 @@
 # 每日 daily-run 流程
 
-**触发**：`.github/workflows/daily-run.yml`，cron `0 23 * * *`（UTC 23:00 = 北京 7:00；GitHub 高峰期实际延后 1–2.5 小时）。也可手动 dispatch，勾 `dry_run` 则跳过 NotebookLM / Telegram / Instagram，只生成文字并提交。
+**触发**：`.github/workflows/daily-run.yml`，cron `0 23 * * *`（UTC 23:00 = 北京 7:00；GitHub 高峰期实际延后 1–2.5 小时）。也可手动 dispatch，勾 `dry_run` 则跳过 NotebookLM / Telegram / Instagram / 图片机器人 webhook，只生成文字并提交。勾 `image_overwrite` 时，webhook 载荷里的 `overwrite` 为 true。
 
 **Runner**：ubuntu-latest，Python 3.13，job 超时 30 分钟，权限 `contents: write`。
 
@@ -61,7 +61,10 @@ flowchart TD
 
     subgraph POST[三、提交与发布 · if: always]
         direction TB
-        COMMIT[git add site/content + poem_history<br/>bot 提交 → pull --rebase → push] --> ART[上传 output/ 为 artifact<br/>保留 7 天]
+        COMMIT[git add site/content + poem_history<br/>有变化才 commit → rebase → push] --> HOOK{已提交且非 dry_run?}
+        HOOK -- 否 --> ART
+        HOOK -- 是 --> BOT[POST 每份 manifest<br/>缺 secret：notice 跳过<br/>失败 continue-on-error]
+        BOT --> ART[上传 output/ 为 artifact<br/>含 manifest，保留 7 天]
         ART --> PAGES[workflow_run → pages.yml<br/>Hugo 构建 → Pagefind 索引 → GitHub Pages]
     end
 
@@ -142,7 +145,7 @@ flowchart TD
 
 ### 4. 通用管线 `_run_content_pipeline`（节令 / 诗词共用）
 
-1. 生成 NotebookLM 用的 Markdown 到 `output/`，prompt 另存 `.prompt.txt`
+1. 生成 NotebookLM 用的 Markdown 到 `output/`，prompt 另存 `.prompt.txt`。落页之后若 prompt 非空，另写 `output/infographic-manifests/<poetry|jieling>_<日期>_<名称>.json`（字段与 webhook 时机见 README「信息图机器人」）。NotebookLM 是否成功不影响这份文件
 2. NotebookLM：查找/创建 notebook → 上传 Markdown 为 source → 创建 infographic（最多 3 次重试，退避 10s/20s）→ 等待完成（超时 300s）→ 重命名 artifact → 下载 PNG。整段 try/except：任何异常 → 返回 None
 3. Instagram：`IG_ENABLED` 时以图 + 文案发帖
 4. 返回图片路径
@@ -157,8 +160,9 @@ Telegram 不再发图：诗词 / 节令页面最终写好后（有图无图皆�
 
 | 步骤 | 做什么 |
 |---|---|
-| Commit generated content（`if: always()`） | `git add site/content data/poem_history.json`；无变化则跳过；有则以 `github-actions[bot]` 提交，`pull --rebase` 后 push 回当前分支。即使 pipeline 标红也执行 |
-| Upload artifact（`if: always()`） | `output/` 打包（Markdown、prompt、原始 PNG），保留 7 天 |
+| Commit generated content（`if: always()`） | `git add site/content data/poem_history.json`；无变化则跳过；有则以 `github-actions[bot]` 提交，`pull --rebase` 后 push 回当前分支。即使 pipeline 标红也执行。输出 `committed=true/false` |
+| Notify image bot | 仅当本次确实提交成功，且不是 `dry_run`。把 `output/infographic-manifests/*.json` 逐个 POST 到 secret `IMAGE_BOT_WEBHOOK_URL`，头 `Authorization: Bearer` + secret `IMAGE_BOT_WEBHOOK_KEY`，超时 30 秒。任一 secret 缺失则 notice 并跳过。失败 `continue-on-error`，不把 run 标红，也不打印 key。流水线 exit 1 但内容已提交时仍然通知 |
+| Upload artifact（`if: always()`） | `output/` 打包（Markdown、prompt、manifest、原始 PNG），保留 7 天 |
 | → `pages.yml` | 由 `workflow_run` 触发（无论 daily-run 绿红）：Hugo 构建 → `npx pagefind` → 部署到 GitHub Pages。不能用 `on: push`——GITHUB_TOKEN 的 push 不触发 push 事件 |
 
 ## 四、每次运行的产出
@@ -167,7 +171,8 @@ Telegram 不再发图：诗词 / 节令页面最终写好后（有图无图皆�
 - **站点**：新诗页 + 六个索引维度自动更新 + 搜索索引
 - **Telegram**：节令链接（如有）+ 诗词链接，各一条短消息；有降级则再加一条汇总
 - **Instagram**：同上图文（若启用）
-- **Actions**：绿 = 完整一天；红 = 有降级，Telegram 里有原因
+- **Actions**：绿 = 完整一天；红 = 有降级，Telegram 里有原因。图片机器人 webhook 失败不会单独把 run 标红
+- **output artifact**：另有 `infographic-manifests/*.json`（有信息图 prompt 的诗词 / 节令各一份）
 
 ## 五、各环节失败后果
 
@@ -180,6 +185,7 @@ Telegram 不再发图：诗词 / 节令页面最终写好后（有图无图皆�
 | 故事 | 有诗页无故事节；TG 汇总；红 |
 | NLM 生成 / 超时 / 异常 | 页面无图；TG 汇总；红 |
 | Telegram 链接 / IG 发送 | 只打日志，不计入降级 |
+| 图片机器人 webhook / secret 缺失 | 页面照常提交；notice 或 warning；run 不因此变红 |
 | LLM key 缺失 | TG 通知；红 |
 
 ## 六、维护操作
@@ -189,4 +195,5 @@ Telegram 不再发图：诗词 / 节令页面最终写好后（有图无图皆�
 - **NotebookLM master token 失效**：本地 `notebooklm login --master-token --account <邮箱>`，然后 `base64 -i ~/.notebooklm/profiles/default/master_token.json | gh secret set NOTEBOOKLM_MASTER_TOKEN`
 - **回补某首诗**：本地 `python main.py --poem 诗题 --no-nlm --no-ig`，提交生成的目录
 - **回补某个节令日**：dispatch 填 `date=YYYY-MM-DD`、勾 `only_jieling`（可配 `dry_run`）；信息图用 `scripts/backfill_infographic.py` 从 artifact 补
-- **调 prompt**：dispatch 勾 `dry_run`，看提交回来的页面，不打扰 Telegram / Instagram
+- **调 prompt**：dispatch 勾 `dry_run`，看提交回来的页面，不打扰 Telegram / Instagram，也不通知图片机器人（manifest 在 artifact 里）
+- **让图片机器人重画已有图**：dispatch 不勾 `dry_run`，勾 `image_overwrite`（需已配置 `IMAGE_BOT_WEBHOOK_URL` 与 `IMAGE_BOT_WEBHOOK_KEY`）
