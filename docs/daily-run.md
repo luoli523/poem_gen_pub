@@ -1,199 +1,77 @@
 # 每日 daily-run 流程
 
-**触发**：`.github/workflows/daily-run.yml`，cron `0 23 * * *`（UTC 23:00 = 北京 7:00；GitHub 高峰期实际延后 1–2.5 小时）。也可手动 dispatch，勾 `dry_run` 则跳过 NotebookLM / Telegram / Instagram / 图片机器人 webhook，只生成文字并提交。勾 `image_overwrite` 时，webhook 载荷里的 `overwrite` 为 true。
+## 触发与运行环境
 
-**Runner**：ubuntu-latest，Python 3.13，job 超时 30 分钟，权限 `contents: write`。
+`.github/workflows/daily-run.yml` 每天 UTC 23:00（北京时间次日 7:00）触发，GitHub 调度可能延迟。运行于 ubuntu-latest、Python 3.13，任务超时 30 分钟。支持手动 dispatch。
 
-## 流程图
+每日入口固定为 `python main.py --image-webhook`。不恢复 NotebookLM 登录态，不做 NotebookLM 认证或生图；图片由外部 webhook 机器人异步生成并推回仓库。
 
-```mermaid
-flowchart TD
-    CRON([⏰ cron 23:00 UTC ≈ 北京 7:00<br/>或手动 dispatch / dry_run]) --> PREP
+## 每日执行顺序
 
-    subgraph PREP[一、准备 · 约 1 分钟]
-        direction TB
-        CO[Checkout main] --> PY[Python 3.13<br/>pip install -r requirements.lock]
-        PY --> NLMAUTH[还原 master_token<br/>notebooklm auth refresh --verify<br/><i>continue-on-error</i>]
-        NLMAUTH --> IGS[还原 IG session<br/><i>secret 为空则跳过</i>]
-    end
+1. Checkout、安装 `requirements.lock` 中的依赖。
+2. 执行 `main.py --image-webhook`，按 Asia/Shanghai 确定日期，读取 LLM 配置。
+3. 本地日历检测节气与节日。有节令时先处理节令，再处理每日诗词。
+4. 写出文字页面、Markdown、生图提示词和信息图 manifest。
+5. Telegram 推送「标题 + 引子 + 页面链接」，不等待图片。图片稍后由机器人补上。
+6. 提交 `site/content` 和 `data/poem_history.json`，pull --rebase 后 push。
+7. 内容确实提交成功且不是 dry_run 时，逐份 POST manifest 给图片机器人。
+8. 上传 `output/` 为 Actions artifact，保留 7 天。
+9. `pages.yml` 在每日任务完成后构建 Hugo、Pagefind 并部署 GitHub Pages；部署后发送当天新诗词订阅邮件。机器人回传图片的提交由站点 push 规则再次触发部署。
 
-    PREP --> INIT
+webhook 模式没有本地产出的图片，因此 daily-run 中原有的 Instagram 图片发布步骤不会执行。
 
-    subgraph MAIN[二、python main.py · 约 3–5 分钟]
-        direction TB
-        INIT[today = 北京日期<br/>problems = ［］] --> KEY{有 LLM key?}
-        KEY -- 否 --> TGNO[TG「当日未执行」] --> RED
-        KEY -- 是 --> CHK[check_auth NotebookLM]
-        CHK -- 失败 --> P1[/记入 problems<br/>本次跳过所有信息图/] --> JQ
-        CHK -- 通过 --> JQ{今天有节令?<br/>节气 / 汉族节日 / 民族节日}
+## 内容如何生成
 
-        JQ -- 是 --> PREV[读往年同名 story.json<br/>作排除] --> JQGEN[LLM 节令素材<br/>六类 · kind · source · 信息图 prompt] --> JPAGE[先落档案页<br/>terms/⟨名⟩/⟨年⟩/ + story.json] --> PIPE1[通用管线 ▶] --> JIMG[补图]
-        JIMG --> MORE{还有同日节令?}
-        MORE -- 是 --> SLEEP0[sleep 30s] --> PREV
-        MORE -- 否 --> SLEEP[sleep 30s] --> POEM
-        JQ -- 否 --> POEM
+### 节令
 
-        POEM[取诗 get_poem<br/>① 排除近 90 天 → 日期关联名篇<br/>② 无关联 → 随机应季] --> POK{有诗?}
-        POK -- 否 --> P2[/记入 problems/] --> END
-        POK -- 是 --> HIST[写入 poem_history.json] --> STORY[背后的故事 get_story<br/>六类 · kind · source<br/>史实无出处 → 存疑<br/>frontmatter 带当天节令名]
-        STORY -- 失败 --> P3[/记入 problems/] --> PAGE1
-        STORY -- 成功 --> PAGE1[先落页面 ⟨日期-诗题⟩/index.md<br/><b>无图</b>]
-        PAGE1 --> PIPE2[通用管线 ▶]
-        PIPE2 -- 有图 --> WEBP[PNG → WebP q85<br/>存入同目录] --> PAGE2[重写页面，加图] --> TGL[Telegram：标题 + 引子 + 页面链接] --> END
-        PIPE2 -- 无图 --> P4[/记入 problems/] --> TGL
+本地用 sxtwl 检测节气、zhdate 换算农历并查表判断节日；部分节日按公历或年度表判断。同一天有多个节令时依次处理。
 
-        END{problems 为空?}
-        END -- 是 --> OK[✅ exit 0]
-        END -- 否 --> TGSUM[一条 TG「今日流水线降级」汇总] --> RED[❌ exit 1]
-    end
+读取往年同名 `story.json` 作为排除要点，调用 LLM 生成六类素材：名义与物候、历代风俗、饮食与器物、诗文、人物与传说、方志记载。每条带可信度与出处，同时生成引子和信息图 prompt。
 
-    subgraph PIPE[▶ 通用管线 _run_content_pipeline]
-        direction TB
-        MD[写 Markdown + prompt 到 output/] --> SKIP{跳过 NLM?}
-        SKIP -- 是 --> RN[返回 None]
-        SKIP -- 否 --> NLM[NotebookLM<br/>找/建 notebook → 上传 source<br/>→ 建 infographic（重试 3 次）<br/>→ 等待 ≤300s → 下载 PNG]
-        NLM -- 异常/失败 --> RN
-        NLM -- 成功 --> IG[Instagram：图 + 文案<br/><i>IG_ENABLED 时</i>] --> RI[返回图片路径]
-    end
+文字落在 `site/content/terms/<节令名>/<年>/index.md`，素材另存 `story.json`。
 
-    OK --> COMMIT
-    RED --> COMMIT
+### 诗词
 
-    subgraph POST[三、提交与发布 · if: always]
-        direction TB
-        COMMIT[git add site/content + poem_history<br/>有变化才 commit → rebase → push] --> HOOK{已提交且非 dry_run?}
-        HOOK -- 否 --> ART
-        HOOK -- 是 --> BOT[POST 每份 manifest<br/>缺 secret：notice 跳过<br/>失败 continue-on-error]
-        BOT --> ART[上传 output/ 为 artifact<br/>含 manifest，保留 7 天]
-        ART --> PAGES[workflow_run → pages.yml<br/>Hugo 构建 → Pagefind 索引 → GitHub Pages]
-    end
+LLM 按精确农历和节令选择关联名篇，排除近 90 天推荐过的诗；无关联时再推荐应季经典。返回诗题、作者、朝代、全文、赏析、风俗与信息图 prompt，并更新 `data/poem_history.json`。
 
-    PAGES --> SITE([🌐 guige.ai/poem_gen_pub])
+再次调用 LLM 整理六类背后故事：作者轶事、本事与创作背景、时代背景、风土人情、民间传说、典故名物。标作史实却没有出处的条目降为存疑。
 
-    style P1 fill:#fff3e0,stroke:#b4402c
-    style P2 fill:#fff3e0,stroke:#b4402c
-    style P3 fill:#fff3e0,stroke:#b4402c
-    style P4 fill:#fff3e0,stroke:#b4402c
-    style RED fill:#b4402c,color:#fff
-    style OK fill:#2e4a7b,color:#fff
-    style PAGE1 fill:#e8e7e1,stroke:#1e2230
-    style PAGE2 fill:#e8e7e1,stroke:#1e2230
-```
+页面写入 `site/content/poems/<日期>-<诗题>/index.md`。`tale.enabled` 控制衍生故事，目前关闭。
 
-读图要点：
+## 生图 webhook
 
-- 橙色方块是四个降级记录点，任一触发，结尾都走红色 `exit 1` 并发一条 Telegram 汇总；但**提交与发布照常执行**（`if: always()`），红色的一天仍然有页面上线。
-- **「先落页面」在通用管线之前**：NotebookLM 那一整块无论怎么坏，当天的诗和考据已经在磁盘上等着被提交。
-- 通用管线被节令和诗词共用。节令按"每节令每年一页"积累（`terms/<名>/<年>/`），往年要点回喂作排除；同日多个节令逐个生成，间隔 30s。
-- 衍生一则（`get_tale`）由 `config.yaml` 的 `tale.enabled` 控制，目前关闭，图里未画。
+每条非空 prompt 写一份 `output/infographic-manifests/<poetry|jieling>_<日期>_<名称>.json`。
 
-## 一、准备（约 1 分钟）
+字段为 `date`、`prompt`、`content_dir`、`upload_path`、可选 `page_url`、`overwrite`。机器人将图片保存为目标内容目录下的 `infographic.webp` 并推回仓库。完整载荷示例见 README「信息图机器人」。
 
-| 步骤 | 做什么 | 失败时 |
-|---|---|---|
-| Checkout | 拉 main | 中止 |
-| Setup Python + pip cache | cache key 按 `requirements.lock` | — |
-| Install dependencies | `pip install -r requirements.lock`，精确版本 | 中止 |
-| Restore NotebookLM auth | 从 secret `NOTEBOOKLM_MASTER_TOKEN` 还原 `~/.notebooklm/profiles/default/master_token.json`，执行 `notebooklm auth refresh --verify` 现场 mint 一份新 cookie | **不中止**（`continue-on-error`），交给 main.py 降级 |
-| Restore Instagram session | 从 secret `IG_SESSION` 还原 `~/.instagram/session.json` | secret 为空则跳过 |
+工作流读取 Secrets：
 
-测试不在这一步跑——`tests.yml` 在代码 push / PR 时执行。
+- `IMAGE_BOT_WEBHOOK_URL`：HTTP(S) webhook 地址。
+- `IMAGE_BOT_WEBHOOK_KEY`：请求头 `Authorization: Bearer <key>` 的令牌。
 
-## 二、`python main.py`（约 3–5 分钟）
+每份 manifest 单独 POST，Content-Type 为 application/json，超时 30 秒。缺少任一 secret 时记录 notice 并跳过；请求失败记录 warning，步骤为 continue-on-error，不单独使 run 标红。接收端返回任务 ID 表示已接收，不代表已经出图。
 
-环境变量来自 secrets：`GROK_API_KEY` / `OPENAI_API_KEY`（Grok 优先）、`TELEGRAM_*`、`IG_*`。
+仅在 `Commit generated content` 成功且确实 push 了新 commit 后通知。即使文字流程最终 exit 1，只要内容提交成功，仍通知已有 manifest。没有新 commit 或没有 manifest 时跳过。
 
-### 0. 初始化
+`overwrite` 默认 false：新页面没有图片，由机器人生成；已有图片不覆盖。手动 dispatch 勾选 `image_overwrite` 时才设为 true。
 
-- `today = beijing_today()`——按 Asia/Shanghai 取日期，不是 runner 的 UTC
-- 没有任何 LLM key → 发 Telegram「当日未执行」→ `exit 1`
-- 读 `config/config.yaml`：模型、`max_completion_tokens`、`site.content_dir`、`tale.enabled`
-- `problems = []`——全程收集降级项
+## dry_run 与命令行
 
-### 1. NotebookLM 认证检测
+- 手动勾选 `dry_run`：在 `--image-webhook` 之外传 `--no-nlm --no-ig`，生成文字和 manifest 并提交，但不推送 Telegram、不调用 webhook。
+- `--image-webhook`：跳过 NotebookLM，保留 Telegram 链接推送。POST 操作由工作流负责，本地运行此命令不会自动 POST。
+- `--no-nlm`：保留原有只生成内容、不推送页面链接的行为。
+- `--date YYYY-MM-DD`：指定日期；`--no-poetry`：仅节令；`--image-overwrite`：让 manifest 请求覆盖已有图。
+- 不带 `--image-webhook` 的本地旧流程仍支持 NotebookLM；每日工作流不走此路径。
 
-`check_auth()` 失败 → 本次全部信息图跳过，记入 problems（附修复指引）。不中止。
+## 失败与维护
 
-### 2. 节令分支（一年约 50 天）
+- LLM key 缺失：通知后退出，不能生成内容。
+- 取诗、素材或故事失败：记录降级，尽可能保留文字页面，结束时汇总 Telegram 并 exit 1。
+- 提交和 artifact 上传使用 if: always()，保留已生成内容。
+- webhook 出图异步完成，失败需查看机器人任务日志；每日任务成功不表示机器人已生成图片。
+- 改模型：编辑 `config/config.yaml` 并配置对应 API key。
+- 查看当日提示词和 manifest：下载 Actions 的 `poem-output-<run_id>` artifact（7 天内）。
+- 重画近 7 天的图：在 Actions 手动运行「重新生成历史信息图」（`redraw-images.yml`），填写原 daily-run 的运行 ID，多个用逗号分隔。它下载原 artifact，使用当天的 manifest 并强制 overwrite=true；不重跑选诗、文字生成或 Telegram 推送。
+- 更早的图：需已有 manifest，再调用机器人，明确需要替换时设置 overwrite=true。
 
-`get_jieling(today)` 每天本地计算（不调 LLM）：sxtwl 判节气，zhdate 换算农历查表判汉族与少数民族节日，寒食按清明前一日，泼水节按公历，藏历新年 / 开斋节 / 古尔邦节按年硬编码。同日可能多个，逐个处理：
-
-1. 读 `terms/<名>/` 下往年的 `story.json`，压成要点清单
-2. LLM 一次调用：六类素材（名义与物候 / 历代风俗 / 饮食与器物 / 诗文中的它 / 人物与传说 / 方志记载，每条 kind + source）+ 引子 + 信息图 prompt，往年要点作排除；少数民族节日要求写明民族、地域、仪式与具名人物
-3. 先落档案页 `terms/<名>/<年>/index.md` + `story.json`（无图）
-4. 通用管线 → 图转 WebP 存入同目录 → 重写页面加图
-5. 失败记入 problems；多个节令之间 `sleep 30s`
-
-节令日且 NLM 可用时，进入诗词分支前再 `sleep 30s`。当天诗词页 frontmatter 带 `jieling: [名]`，与档案页互链。
-
-### 3. 诗词分支
-
-**3a. 取诗** `get_poem(today)`——两次 LLM 调用兜底：
-
-1. system prompt 注入近 90 天已推诗词的强制排除列表（`data/poem_history.json`，git 管理），附精确的农历、节气事实，让模型判断今天是否有关联名篇
-2. 无关联 → 第二次调用随机推荐应季经典
-
-返回 title / author / dynasty / full_text / occasion / meaning / customs / infographic_prompt。校验通过即写入 history。返回 None → 记入 problems（含当前模型名）。
-
-**3b. 背后的故事** `get_story(poem)`——第二次 LLM 调用，六类素材（作者轶事 / 本事与创作背景 / 时代背景 / 风土人情 / 民间传说 / 典故名物），每条 `text + kind（史实|传说|附会|存疑）+ source`。代码层强制：自称史实而无出处 → 降级存疑。失败 → None，记入 problems。
-
-**3c. 先落页面**——`site/content/poems/<日期>-<诗题>/index.md`（Hugo leaf bundle）：frontmatter 含基本信息 + 六个 taxonomy 字段（authors, dynasties, occasions, categories, kinds, pivot_types）+ summary；正文 = 诗 → 赏析 → 相关风俗 → 背后的故事（每条末尾 `〔史实 · 《宋史》〕`）。此时无图。
-
-**3d. 通用管线** → 拿到 PNG 路径。
-
-**3e. 补图**——PNG → WebP（原尺寸、q85）存入同目录 `infographic.webp`，重写页面加上图。未拿到图且未主动跳过 → 记入 problems。
-
-### 4. 通用管线 `_run_content_pipeline`（节令 / 诗词共用）
-
-1. 生成 NotebookLM 用的 Markdown 到 `output/`，prompt 另存 `.prompt.txt`。落页之后若 prompt 非空，另写 `output/infographic-manifests/<poetry|jieling>_<日期>_<名称>.json`（字段与 webhook 时机见 README「信息图机器人」）。NotebookLM 是否成功不影响这份文件
-2. NotebookLM：查找/创建 notebook → 上传 Markdown 为 source → 创建 infographic（最多 3 次重试，退避 10s/20s）→ 等待完成（超时 300s）→ 重命名 artifact → 下载 PNG。整段 try/except：任何异常 → 返回 None
-3. Instagram：`IG_ENABLED` 时以图 + 文案发帖
-4. 返回图片路径
-
-Telegram 不再发图：诗词 / 节令页面最终写好后（有图无图皆可），各发一条「标题 + 引子 + 站内链接」的短消息（dry_run 不发）。
-
-### 5. 收尾
-
-`problems` 非空 → 打印全部 → 一条 Telegram「今日流水线降级」汇总 → `exit 1`。为空 → `exit 0`。
-
-## 三、提交与发布
-
-| 步骤 | 做什么 |
-|---|---|
-| Commit generated content（`if: always()`） | `git add site/content data/poem_history.json`；无变化则跳过；有则以 `github-actions[bot]` 提交，`pull --rebase` 后 push 回当前分支。即使 pipeline 标红也执行。输出 `committed=true/false` |
-| Notify image bot | 仅当本次确实提交成功，且不是 `dry_run`。把 `output/infographic-manifests/*.json` 逐个 POST 到 secret `IMAGE_BOT_WEBHOOK_URL`，头 `Authorization: Bearer` + secret `IMAGE_BOT_WEBHOOK_KEY`，超时 30 秒。任一 secret 缺失则 notice 并跳过。失败 `continue-on-error`，不把 run 标红，也不打印 key。流水线 exit 1 但内容已提交时仍然通知 |
-| Upload artifact（`if: always()`） | `output/` 打包（Markdown、prompt、manifest、原始 PNG），保留 7 天 |
-| → `pages.yml` | 由 `workflow_run` 触发（无论 daily-run 绿红）：Hugo 构建 → `npx pagefind` → 部署到 GitHub Pages。不能用 `on: push`——GITHUB_TOKEN 的 push 不触发 push 事件 |
-
-## 四、每次运行的产出
-
-- **git**：诗词 bundle（`index.md` + `infographic.webp`）+ `poem_history.json` 一条记录；节令日另加 `terms/<名>/<年>/`（`index.md` + `story.json` + 图）
-- **站点**：新诗页 + 六个索引维度自动更新 + 搜索索引
-- **Telegram**：节令链接（如有）+ 诗词链接，各一条短消息；有降级则再加一条汇总
-- **Instagram**：同上图文（若启用）
-- **Actions**：绿 = 完整一天；红 = 有降级，Telegram 里有原因。图片机器人 webhook 失败不会单独把 run 标红
-- **output artifact**：另有 `infographic-manifests/*.json`（有信息图 prompt 的诗词 / 节令各一份）
-
-## 五、各环节失败后果
-
-| 失败点 | 结果 |
-|---|---|
-| 依赖安装 / checkout | 当天无产出，run 红，无 Telegram（pipeline 未启动） |
-| NLM 认证（step 或 check） | 有诗、有考据、有页面（含节令档案），无图；TG 汇总；红 |
-| 节令素材 | 档案页落地但无内容；TG 汇总；红（可 `--date` 回补） |
-| 取诗 | 当天无诗词页；TG 汇总；红 |
-| 故事 | 有诗页无故事节；TG 汇总；红 |
-| NLM 生成 / 超时 / 异常 | 页面无图；TG 汇总；红 |
-| Telegram 链接 / IG 发送 | 只打日志，不计入降级 |
-| 图片机器人 webhook / secret 缺失 | 页面照常提交；notice 或 warning；run 不因此变红 |
-| LLM key 缺失 | TG 通知；红 |
-
-## 六、维护操作
-
-- **换模型**：改 `config/config.yaml` 的 `openai.model`；换服务商则调整 secrets（Grok 优先于 OpenAI）
-- **升级依赖**：按 `requirements.lock` 头部注释重新生成，然后 dispatch 一次 `dry_run`
-- **NotebookLM master token 失效**：本地 `notebooklm login --master-token --account <邮箱>`，然后 `base64 -i ~/.notebooklm/profiles/default/master_token.json | gh secret set NOTEBOOKLM_MASTER_TOKEN`
-- **回补某首诗**：本地 `python main.py --poem 诗题 --no-nlm --no-ig`，提交生成的目录
-- **回补某个节令日**：dispatch 填 `date=YYYY-MM-DD`、勾 `only_jieling`（可配 `dry_run`）；信息图用 `scripts/backfill_infographic.py` 从 artifact 补
-- **调 prompt**：dispatch 勾 `dry_run`，看提交回来的页面，不打扰 Telegram / Instagram，也不通知图片机器人（manifest 在 artifact 里）
-- **让图片机器人重画已有图**：dispatch 不勾 `dry_run`，勾 `image_overwrite`（需已配置 `IMAGE_BOT_WEBHOOK_URL` 与 `IMAGE_BOT_WEBHOOK_KEY`）
+每日生图不再需要 `NOTEBOOKLM_MASTER_TOKEN`，已有 secret 可以保留，工作流不会读取。

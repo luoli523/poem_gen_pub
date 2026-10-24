@@ -8,7 +8,7 @@ on:
     # 支持手动触发
     inputs:
       dry_run:
-        description: "只生成内容并提交，不跑 NotebookLM / Telegram / Instagram / 图片机器人 webhook（调 prompt 用）"
+        description: "只生成内容并提交，不推送 Telegram、不通知图片机器人 webhook（调 prompt 用）"
         type: boolean
         default: false
       date:
@@ -45,25 +45,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.lock
 
-      - name: Restore NotebookLM auth
-        # 认证失败不中止 job：main.py 会跳过信息图、发 Telegram、结尾 exit 1 标红，
-        # 但当天的诗与考据仍然生成并提交（页面先写、图后补）
-        continue-on-error: true
-        run: |
-          if [ -z "$NOTEBOOKLM_MASTER_TOKEN" ]; then
-            echo "::error::缺少 secret NOTEBOOKLM_MASTER_TOKEN，无法生成 infographic。" \
-                 "请执行：base64 -i ~/.notebooklm/profiles/default/master_token.json |" \
-                 "gh secret set NOTEBOOKLM_MASTER_TOKEN"
-            exit 1
-          fi
-          # 用长期 master token 现场 mint 一份新 cookie（无需浏览器），
-          # 避免 storage_state 快照随 Google 轮转而过期
-          mkdir -p ~/.notebooklm/profiles/default
-          echo "$NOTEBOOKLM_MASTER_TOKEN" | base64 -d > ~/.notebooklm/profiles/default/master_token.json
-          notebooklm auth refresh --verify
-        env:
-          NOTEBOOKLM_MASTER_TOKEN: ${{ secrets.NOTEBOOKLM_MASTER_TOKEN }}
-
       - name: Restore Instagram session
         if: env.IG_SESSION != ''
         run: |
@@ -85,7 +66,7 @@ jobs:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
         run: >
-          python main.py
+          python main.py --image-webhook
           ${{ inputs.dry_run && '--no-nlm --no-ig' || '' }}
           ${{ inputs.date != '' && format('--date {0}', inputs.date) || '' }}
           ${{ inputs.only_jieling && '--no-poetry' || '' }}
@@ -111,8 +92,8 @@ jobs:
 
       - name: Notify image bot
         # 只在内容真正提交之后通知。dry_run 用来调 prompt，不跑外部发布
-        # （NotebookLM / Telegram / Instagram），图片机器人同样会出图并推回仓库，所以也不通知。
-        # 流水线 exit 1（例如 NotebookLM 失败）但页面已提交时仍然 POST，机器人可以补图。
+        # 图片由机器人异步生成并推回仓库；daily-run 不调用 NotebookLM。
+        # 流水线 exit 1 但页面已提交时仍然 POST，机器人可以补图。
         # manifest 在两种情况下都会写到 output/infographic-manifests/，随 artifact 可查看。
         if: always() && cancelled() == false && steps.commit.conclusion == 'success' && steps.commit.outputs.committed == 'true' && (github.event_name != 'workflow_dispatch' || inputs.dry_run == false)
         continue-on-error: true

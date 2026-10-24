@@ -41,6 +41,8 @@ from src.poetry.content import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="古诗词与节气内容生成系统")
+    parser.add_argument("--image-webhook", action="store_true",
+                        help="由图片机器人异步生图：跳过 NotebookLM，保留页面链接推送，写出 webhook manifest")
     parser.add_argument("--no-nlm", action="store_true", help="跳过 NotebookLM 生成流程")
     parser.add_argument("--no-ig", action="store_true", help="跳过 Instagram 发布")
 
@@ -121,7 +123,7 @@ async def _run_content_pipeline(
         print(f"  ⚠ LLM 未返回{label} infographic prompt")
 
     if skip_notebooklm:
-        print("  ⏭ 跳过 NotebookLM（--no-nlm）")
+        print("  ⏭ 跳过 NotebookLM（--no-nlm / --image-webhook），已保存生图提示词")
         return None
 
     # 2. NotebookLM 生成 infographic
@@ -233,6 +235,7 @@ async def _run_poem_flow(
     skip_notebooklm: bool, skip_ig: bool, tale_enabled: bool, ratio: str,
     problems: list[str], jieling: list[str] | None = None, base_url: str = "",
     image_overwrite: bool = False,
+    notify_pages: bool = False,
 ) -> None:
     """诗词完整流程：故事 → 先落一版无图页面 → 信息图/推送 → 图转 WebP 存入页面目录并重写页面。
 
@@ -274,7 +277,7 @@ async def _run_poem_flow(
     elif not skip_notebooklm:
         problems.append(f"《{poem['title']}》信息图未生成（NotebookLM 失败），页面无图")
 
-    if base_url and not skip_notebooklm:   # dry_run 不推送
+    if base_url and (notify_pages or not skip_notebooklm):   # webhook 模式仍推送，dry_run 不推送
         summary = (story or {}).get("summary", "")
         await _notify_page(
             f"📜 <b>{poem['title']}</b>　{poem['dynasty']}·{poem['author']}\n"
@@ -312,6 +315,7 @@ async def _run_jieling_flow(
     item: dict, today: str, output_dir: Path, terms_dir: Path,
     skip_notebooklm: bool, skip_ig: bool, ratio: str, problems: list[str], base_url: str = "",
     image_overwrite: bool = False,
+    notify_pages: bool = False,
 ) -> None:
     """一个节令的完整流程：读往年 → 生成素材 → 先落页面 + story.json → 信息图/推送 → 补图。
 
@@ -364,7 +368,7 @@ async def _run_jieling_flow(
     elif not skip_notebooklm:
         problems.append(f"节令「{item['name']}」信息图未生成（NotebookLM 失败），页面无图")
 
-    if base_url and not skip_notebooklm:
+    if base_url and (notify_pages or not skip_notebooklm):
         who = item["category"] if not item.get("ethnic") else f"{item['ethnic']}·{item['category']}"
         await _notify_page(
             f"🌿 <b>{item['name']}</b>　{who}\n"
@@ -378,7 +382,8 @@ async def _run_jieling_flow(
 
 async def main():
     args = parse_args()
-    skip_notebooklm = args.no_nlm
+    skip_notebooklm = args.no_nlm or args.image_webhook
+    notify_pages = args.image_webhook and not args.no_nlm
 
     print("=== 古诗词与节气内容生成系统 ===\n")
 
@@ -436,7 +441,7 @@ async def main():
             await _run_jieling_flow(
                 item, today=today, output_dir=output_dir, terms_dir=terms_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, ratio=args.ratio, problems=problems,
-                base_url=base_url, image_overwrite=args.image_overwrite,
+                base_url=base_url, image_overwrite=args.image_overwrite, notify_pages=notify_pages,
             )
     else:
         print(f"\n🌿 今日无节令")
@@ -457,7 +462,7 @@ async def main():
                 poem, name_key=poem["title"], today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
                 ratio=args.ratio, problems=problems, jieling=jieling_names, base_url=base_url,
-                image_overwrite=args.image_overwrite,
+                image_overwrite=args.image_overwrite, notify_pages=notify_pages,
             )
         else:
             print(f"📜 诗词「{args.poem}」获取失败，跳过")
@@ -472,7 +477,7 @@ async def main():
                 poem, name_key=occasion, today=today, output_dir=output_dir, site_dir=site_dir,
                 skip_notebooklm=skip_notebooklm, skip_ig=args.no_ig, tale_enabled=tale_enabled,
                 ratio=args.ratio, problems=problems, jieling=jieling_names, base_url=base_url,
-                image_overwrite=args.image_overwrite,
+                image_overwrite=args.image_overwrite, notify_pages=notify_pages,
             )
         else:
             print(f"📜 诗词获取失败，跳过")

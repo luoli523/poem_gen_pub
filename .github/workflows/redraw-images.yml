@@ -1,0 +1,76 @@
+name: 重新生成历史信息图
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_ids:
+        description: "原 daily-run 的运行 ID，多个用逗号分隔（artifact 须尚未过期）"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  redraw:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download original manifests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_IDS: ${{ inputs.run_ids }}
+        run: |
+          IFS=',' read -ra ids <<< "$RUN_IDS"
+          for run_id in "${ids[@]}"; do
+            run_id="${run_id//[[:space:]]/}"
+            if [[ ! "$run_id" =~ ^[0-9]+$ ]]; then
+              echo "::error::运行 ID 必须为数字"
+              exit 1
+            fi
+            gh run download "$run_id" --name "poem-output-$run_id" --dir "original/$run_id"
+          done
+
+      - name: Request replacement images
+        env:
+          IMAGE_BOT_WEBHOOK_URL: ${{ secrets.IMAGE_BOT_WEBHOOK_URL }}
+          IMAGE_BOT_WEBHOOK_KEY: ${{ secrets.IMAGE_BOT_WEBHOOK_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          url = os.environ["IMAGE_BOT_WEBHOOK_URL"]
+          key = os.environ["IMAGE_BOT_WEBHOOK_KEY"]
+          if not url.startswith(("https://", "http://")) or not key:
+              raise SystemExit("需要配置 HTTP(S) IMAGE_BOT_WEBHOOK_URL 和 IMAGE_BOT_WEBHOOK_KEY")
+          manifests = sorted(Path("original").glob("*/infographic-manifests/*.json"))
+          if not manifests:
+              raise SystemExit("附件中没有生图 manifest")
+          failed = False
+          for manifest in manifests:
+              payload = json.loads(manifest.read_text(encoding="utf-8"))
+              payload["overwrite"] = True
+              request = urllib.request.Request(
+                  url, data=json.dumps(payload, ensure_ascii=False).encode(),
+                  headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
+                  method="POST",
+              )
+              print("请求覆盖:", payload["upload_path"], flush=True)
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      result = json.load(response)
+                  if not isinstance(result, dict) or result.get("success") is not True:
+                      raise ValueError("机器人未确认接收")
+                  print("已接收，任务 ID:", result.get("runUuid", "未返回"), flush=True)
+              except (urllib.error.URLError, ValueError, TimeoutError) as exc:
+                  print("::error::补图请求失败:", type(exc).__name__, flush=True)
+                  failed = True
+          if failed:
+              raise SystemExit(1)
+          PY

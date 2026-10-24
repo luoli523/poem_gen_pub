@@ -1,6 +1,6 @@
 # 古诗词与节气内容生成系统
 
-每日自动检测节气和节日，调用 LLM 匹配应景古诗词，通过 NotebookLM 生成精美 infographic，并自动推送到 Telegram 和 Instagram。
+每日自动检测节气和节日，调用 LLM 匹配应景古诗词，通过 webhook 图片机器人生成 infographic，并推送页面链接到 Telegram。
 
 支持 Grok (xAI)、ChatGPT、DeepSeek 等 OpenAI 兼容 API。
 
@@ -8,8 +8,8 @@
 
 - **节气检测**：自动识别二十四节气及传统节日（七夕、重阳等）
 - **诗词匹配**：调用 LLM 动态匹配当日最应景的古诗词
-- **Infographic 生成**：通过 NotebookLM 将内容渲染为精美图片
-- **多平台发布**：Telegram 推送页面链接（标题 + 引子），Instagram 发布信息图
+- **Infographic 生成**：通过 webhook 将提示词交给图片机器人生成并回传图片
+- **多平台发布**：Telegram 推送页面链接（标题 + 引子）；webhook 异步出图模式不在 daily-run 中发布 Instagram
 - **背后的故事**：第二次 LLM 调用整理作者轶事、本事、时代背景、风土人情、传说、典故六类素材，每条标注可信度与出处，写入 `site/content/poems/` 并提交回仓库持续积累
 - **每日自动运行**：GitHub Actions 每天北京时间 7:00 执行
 - **多 LLM 支持**：Grok、ChatGPT、DeepSeek 等 OpenAI 兼容服务均可使用
@@ -17,8 +17,8 @@
 ## 流程
 
 ```
-节气检测 → 生成节气 Markdown → NotebookLM infographic → Telegram → Instagram
-诗词检测（LLM）→ 背后的故事（LLM）→ 站点内容页 → 生成诗词 Markdown → NotebookLM infographic → Telegram → Instagram
+节令检测 / 诗词匹配 → LLM 素材与生图提示词 → 文字页面 + manifest → Telegram 链接
+提交内容 → POST webhook → 图片机器人出图并推回仓库 → 发布站点
 ```
 
 ## 网站
@@ -82,7 +82,7 @@ openai:
 
 ### 4. 登录第三方服务
 
-**NotebookLM**（必须）：
+**NotebookLM**（仅本地使用旧版直接生图时需要，每日 webhook 流程不需要）：
 ```bash
 python -c "from notebooklm import login; login()"
 ```
@@ -95,13 +95,16 @@ python scripts/ig_login.py
 ### 5. 运行
 
 ```bash
-python main.py
+python main.py --image-webhook
 ```
+
+此命令生成内容、manifest 并按配置推送 Telegram 链接；POST webhook 由 GitHub Actions 在内容提交后执行。
 
 **可选参数：**
 
 | 参数 | 说明 |
 |---|---|
+| `--image-webhook` | 跳过 NotebookLM，保存 manifest，保留 Telegram 页面链接推送（daily-run 使用） |
 | `--no-nlm` | 跳过 NotebookLM，只生成 Markdown |
 | `--no-ig` | 跳过 Instagram 发布 |
 | `--no-poetry` | 跳过诗词模块（不调用 LLM） |
@@ -115,7 +118,6 @@ python main.py
 |---|---|
 | `GROK_API_KEY` | Grok (xAI) API Key（与 OPENAI_API_KEY 二选一） |
 | `OPENAI_API_KEY` | OpenAI API Key（与 GROK_API_KEY 二选一） |
-| `NOTEBOOKLM_STORAGE_STATE` | NotebookLM 登录态（base64） |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot Token |
 | `TELEGRAM_CHAT_ID` | Telegram Chat ID |
 | `IG_USERNAME` | Instagram 用户名 |
@@ -126,13 +128,12 @@ python main.py
 
 生成 base64 session：
 ```bash
-base64 < ~/.notebooklm/storage_state.json | gh secret set NOTEBOOKLM_STORAGE_STATE
 base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 ```
 
 ### 信息图机器人
 
-每日流水线在 **内容确实提交成功之后**，把当天每条信息图请求 POST 给外部图片机器人。机器人按 prompt 生成 `infographic.webp`，再推回仓库。NotebookLM、Telegram、Instagram 的行为不变；manifest 是额外产物。
+每日流水线在 **内容确实提交成功之后**，把当天每条信息图请求 POST 给外部图片机器人。机器人按 prompt 生成 `infographic.webp`，再推回仓库。每日任务固定使用 `--image-webhook`，不恢复 NotebookLM 登录态、不调用 NotebookLM。Telegram 正常推送页面链接；图片异步返回，因此本任务不再直接发布 Instagram。
 
 信息图 prompt 的来源：
 
@@ -144,7 +145,7 @@ base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 - 诗词：`poetry_<YYYY-MM-DD>_<诗题>.json`，`content_dir` 如 `site/content/poems/2026-10-21-偶成`
 - 节令：`jieling_<YYYY-MM-DD>_<节令名>.json`，`content_dir` 如 `site/content/terms/白露/2026`
 
-跳过 NotebookLM（`--no-nlm`，或认证失败）时只要 prompt 还在，manifest 照写，这样机器人可以补图。
+`--image-webhook` 模式始终跳过 NotebookLM；只要 prompt 非空，就会保存 manifest 供机器人出图。
 
 载荷字段：`date`、`prompt`（完整信息图 prompt）、`content_dir`（相对仓库根）、`upload_path`（`<content_dir>/infographic.webp`）、可选 `page_url`（配置了 `site.base_url` 时才有）、`overwrite`（默认 `false`）。
 
@@ -161,11 +162,11 @@ base64 < ~/.instagram/session.json | gh secret set IG_SESSION
 
 手动触发勾上 `image_overwrite` 时，流水线会带 `--image-overwrite`，载荷里的 `overwrite` 为 `true`。定时运行不带这个参数，保持 `false`。
 
-**什么时候 POST**：`Commit generated content` 成功，并且这次确实产生了 commit（`site/content` 或 `data/poem_history.json` 有变化并 push 上去）之后。定时运行会发；手动运行未勾 `dry_run` 也会发。流水线因为降级以 exit 1 结束、但页面已经提交时仍然发，方便在 NotebookLM 失败时补图。
+**什么时候 POST**：`Commit generated content` 成功，并且这次确实产生了 commit（`site/content` 或 `data/poem_history.json` 有变化并 push 上去）之后。定时运行会发；手动运行未勾 `dry_run` 也会发。流水线因为降级以 exit 1 结束、但页面已经提交时仍然发，保证已有文字页面仍能交给机器人补图。
 
 **什么时候不 POST**：
 
-- `dry_run`：这一档用来调 prompt，不跑 NotebookLM / Telegram / Instagram。图片机器人会出图并推回仓库，同样是外部发布，所以不通知。manifest 仍在 artifact 里，可以查看载荷。
+- `dry_run`：这一档用来调 prompt，不推送 Telegram，也不通知图片机器人。manifest 仍在 artifact 里，可以查看载荷。
 - 没有新 commit（内容与上次相同）。
 - `IMAGE_BOT_WEBHOOK_URL` 或 `IMAGE_BOT_WEBHOOK_KEY` 有一个缺失：打一条 notice，跳过。
 - 这次提交没有 manifest（例如节令素材失败、诗词没有 prompt）。
