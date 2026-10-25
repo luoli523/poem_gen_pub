@@ -6,4 +6,10 @@
 {{ with $m }}{{ $raw := index (index . 0) 1 }}{{ $c = replace $c (index (index $m 0) 0) (printf `<p class="poem">%s</p>` (partial "poem-lines.html" $raw)) }}{{ end }}
 {{/* 条目文本限定为无标签（RE2 无 lookahead，.*? 会跨过 </li> 匹配到下一个列表）；含标签的条目退回普通 li */}}
 {{ $c = replaceRE `<li>([^<]*?)\s*〔([^·〕]+?)(?: · ([^〕]*))?〕\s*</li>` `<li class="noted"><span class="li-text">$1</span><aside class="note" data-kind="$2"><b>$2</b><span class="src">$3</span></aside></li>` $c }}
+{{/* 异步回传只有图片文件时补上展示，旧页面已有 Markdown 图片则不重复。 */}}
+{{ if not (strings.Contains $c `class="infographic"`) }}
+{{ with partial "infographic-resource.html" . }}
+<figure class="infographic"><a class="zoom-link" href="{{ .RelPermalink }}" data-alt="{{ $.Title }} 信息图" title="点击放大"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $.Title }} 信息图" loading="lazy" decoding="async"></a></figure>
+{{ end }}
+{{ end }}
 {{ $c | safeHTML }}

@@ -1,13 +1,12 @@
 {{ define "main" }}
-{{ $poems := where site.RegularPages "Section" "poems" }}
-{{/* 同一天可能有多首（手动运行），首页优先展示有信息图的最新一首 */}}
-{{ $withImg := where (where $poems "Params.infographic" "!=" nil) "Params.infographic" "!=" "" }}
-{{ $today := index $withImg 0 | default (index $poems 0) }}
+{{ $poems := (where site.RegularPages "Section" "poems").ByDate.Reverse }}
+{{/* 图片异步生成，首页始终展示最新内容，不等待图片回传。 */}}
+{{ $today := index $poems 0 }}
 <main id="main" class="home">
 {{ with $today }}
   <article class="today">
     {{ $p := . }}{{/* 嵌套 with 里 $ 是首页，不是这首诗 */}}
-    {{ with .Resources.Get .Params.infographic }}
+    {{ with partial "infographic-resource.html" . }}
     <a class="today-fig" href="{{ $p.RelPermalink }}"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $p.Title }} 信息图" decoding="async"></a>
     {{ end }}
     <div class="today-text">
@@ -35,7 +34,7 @@
   <section class="recent">
     <h2>节令</h2>
     <article class="today term-highlight">
-      {{ with $latest.Resources.Get $latest.Params.infographic }}
+      {{ with partial "infographic-resource.html" $latest }}
       <a class="today-fig" href="{{ $latest.RelPermalink }}"><img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="{{ $latest.Title }} 信息图" loading="lazy" decoding="async"></a>
       {{ end }}
       <div class="today-text">

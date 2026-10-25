@@ -18,6 +18,8 @@
 8. 上传 `output/` 为 Actions artifact，保留 7 天。
 9. `pages.yml` 在每日任务完成后构建 Hugo、Pagefind 并部署 GitHub Pages；部署后发送当天新诗词订阅邮件。机器人回传图片的提交由站点 push 规则再次触发部署。
 
+站点模板会自动识别内容目录中的 `infographic.webp`，机器人只回传图片文件也能显示，无需修改 frontmatter 或正文。首页始终按日期展示最新诗词，图片尚未回传时先显示文字。
+
 webhook 模式没有本地产出的图片，因此 daily-run 中原有的 Instagram 图片发布步骤不会执行。
 
 ## 内容如何生成

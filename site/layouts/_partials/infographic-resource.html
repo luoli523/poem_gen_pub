@@ -1,0 +1,2 @@
+{{/* webhook 只回传文件时，无需同步修改 frontmatter 即可识别信息图。 */}}
+{{- return (.Resources.Get (.Params.infographic | default "infographic.webp")) -}}
